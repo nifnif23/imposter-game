@@ -2,11 +2,9 @@
   "name": "imposter-game-server",
   "version": "1.0.0",
   "type": "module",
-  "description": "Backend for Imposter Word Game",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start": "node index.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {
