@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Black background -->
+  <rect width="32" height="32" fill="#08090d" rx="6"/>
+  <!-- Red triangle (same red as --accent: #e63950) -->
+  <polygon points="16,5 29,27 3,27" fill="#e63950"/>
+  <!-- Small dark circle in centre of triangle — the "imposter" detail -->
+  <circle cx="16" cy="21" r="2.2" fill="#08090d"/>
+  <!-- Dot above — exclamation mark style -->
+  <circle cx="16" cy="14" r="1.5" fill="#08090d"/>
+</svg>
