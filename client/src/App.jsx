@@ -1110,13 +1110,15 @@ JSON only:`;
 function SoloTestPage({ onLeave }) {
   const SERVER = import.meta.env.VITE_SERVER_URL || "";
 
-  const [playerCount, setPlayerCount] = useState(4);
+  const [playerCount,   setPlayerCount]   = useState(4);
   const [imposterCount, setImposterCount] = useState(1);
-  const [mode, setMode] = useState("hidden");
-  const [themeId, setThemeId] = useState(null);
-  const [themes, setThemes] = useState([]);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [mode,          setMode]          = useState("hidden");
+  const [themeId,       setThemeId]       = useState(null);
+  const [themes,        setThemes]        = useState([]);
+  const [fullTheme,     setFullTheme]     = useState(null); // full theme with words
+  const [loadingTheme,  setLoadingTheme]  = useState(false);
+  const [result,        setResult]        = useState(null);
+  const [loading,       setLoading]       = useState(false);
 
   useEffect(() => {
     fetch(`${SERVER}/themes`)
@@ -1125,26 +1127,21 @@ function SoloTestPage({ onLeave }) {
       .catch(()=>{});
   }, []);
 
-  // When a theme is selected, fetch its full word list
+  // When a theme is selected, fetch its full word list immediately
   useEffect(() => {
-    if (!themeId) return;
-    const existing = themes.find(t => t.id === themeId);
-    if (existing?.words?.length) return; // already have words
+    if (!themeId) { setFullTheme(null); return; }
+    setLoadingTheme(true);
+    setFullTheme(null);
     fetch(`${SERVER}/themes/${themeId}`)
       .then(r=>r.json())
-      .then(data => {
-        if (data?.words) {
-          setThemes(prev => prev.map(t => t.id === themeId ? {...t, words: data.words} : t));
-        }
-      })
-      .catch(()=>{});
+      .then(data => { setFullTheme(data); setLoadingTheme(false); })
+      .catch(()=>setLoadingTheme(false));
   }, [themeId]);
 
   // Simulate role assignment locally (mirrors server logic exactly)
   function simulate() {
     setLoading(true);
-    const theme = themes.find(t => t.id === themeId);
-    const pool = theme?.words?.length
+    const pool = fullTheme?.words?.length
       ? theme.words
       : ["kettle","mirror","pillow","blanket","curtain","ladder","bucket","candle","drawer","fridge",
         "toaster","scissors","hammer","stapler","envelope","calendar","remote","charger","umbrella","suitcase",
@@ -1227,13 +1224,23 @@ function SoloTestPage({ onLeave }) {
         </div>
         <div className="settings-row" style={{flexDirection:"column",alignItems:"flex-start",gap:6}}>
           <label>Theme</label>
-          <select value={themeId||""} style={{width:"100%"}} onChange={e=>setThemeId(e.target.value||null)}>
+          <select value={themeId||""} style={{width:"100%"}} onChange={e=>{setThemeId(e.target.value||null);setResult(null);}}>
             <option value="">Default words (no theme)</option>
             {themes.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
+          {loadingTheme && (
+            <div style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--muted)",display:"flex",alignItems:"center",gap:6,marginTop:4}}>
+              <span className="spin"/>fetching word pool…
+            </div>
+          )}
+          {fullTheme && (
+            <div style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--green)",marginTop:4}}>
+              {fullTheme.words?.length} words loaded
+            </div>
+          )}
         </div>
 
-        <button className="btn btn--yellow" disabled={loading} style={{marginTop:16}} onClick={simulate}>
+        <button className="btn btn--yellow" disabled={loading||loadingTheme||(themeId&&!fullTheme)} style={{marginTop:16}} onClick={simulate}>
           {loading ? <><span className="spin"/>Simulating…</> : "Run Simulation"}
         </button>
 
