@@ -241,8 +241,12 @@ function LobbyPage({ game, onLeave }) {
   const [settings, setSettings] = useState({ imposters:1, mode:"hidden", themeId:null });
   const [copied,   setCopied]   = useState(null); // false | "link" | "code" 
 
+  const [themeError, setThemeError] = useState(false);
+
   useEffect(() => {
-    api.get("/themes").then(t => setThemes(Array.isArray(t) ? t : [])).catch(()=>{});
+    api.get("/themes")
+      .then(t => { setThemes(Array.isArray(t) ? t : []); setThemeError(false); })
+      .catch(() => setThemeError(true));
   }, []);
 
   function shareLink() {
@@ -350,13 +354,34 @@ function LobbyPage({ game, onLeave }) {
                 </select>
               </div>
               <div className="settings-row" style={{flexDirection:"column",alignItems:"flex-start",gap:8}}>
-                <label>Theme</label>
-                <div style={{display:"flex",flexDirection:"column",gap:5,width:"100%",maxHeight:170,overflowY:"auto"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}>
+                  <label style={{marginBottom:0}}>Theme</label>
+                  {themeError && (
+                    <button className="nav-link" onClick={()=>{
+                      setThemeError(false);
+                      api.get("/themes").then(t=>{setThemes(Array.isArray(t)?t:[]);setThemeError(false);}).catch(()=>setThemeError(true));
+                    }}>retry</button>
+                  )}
+                  {themes.length > 0 && (
+                    <span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)"}}>{themes.length} themes</span>
+                  )}
+                </div>
+                {themeError && (
+                  <div style={{fontSize:12,color:"var(--accent)",fontFamily:"var(--mono)",padding:"6px 0"}}>
+                    Could not load themes — server may be starting up
+                  </div>
+                )}
+                <div style={{display:"flex",flexDirection:"column",gap:5,width:"100%",maxHeight:220,overflowY:"auto"}}>
                   <div className={`theme-card ${!settings.themeId?"theme-card--active":""}`}
                     onClick={()=>setSettings(s=>({...s,themeId:null}))}>
                     <span className="theme-card__name">No theme (random words)</span>
                     {!settings.themeId && <span className="badge badge--green">selected</span>}
                   </div>
+                  {themes.length === 0 && !themeError && (
+                    <div style={{fontSize:12,color:"var(--muted)",padding:"6px 0",fontFamily:"var(--mono)"}}>
+                      <span className="spin" style={{marginRight:6}}/>loading themes…
+                    </div>
+                  )}
                   {themes.map(t=>(
                     <div key={t.id}
                       className={`theme-card ${settings.themeId===t.id?"theme-card--active":""}`}
