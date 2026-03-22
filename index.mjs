@@ -168,11 +168,10 @@ app.post("/admin/scrape", async (req, res) => {
 
 // ── Helper: fetch a URL and extract readable plain text ───────
 async function scrapeUrl(url) {
-  // Validate URL
-  const parsed = new URL(url); // throws if invalid
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("Only HTTP/HTTPS URLs are supported");
-  }
+  // Validate URL — return empty string instead of throwing
+  let parsed;
+  try { parsed = new URL(url); } catch { return ""; }
+  if (!["http:", "https:"].includes(parsed.protocol)) return "";
 
   const resp = await fetch(url, {
     headers: {
@@ -232,18 +231,23 @@ app.post("/admin/generate", async (req, res) => {
   const { data: cached } = await supabase.from("ai_cache").select("*").eq("cache_key", cacheKey).single();
   if (cached) return res.json({ ...cached.result, cached: true });
 
-  // Scrape any reference URLs and append to referenceText
+  // Scrape any reference URLs and append to referenceText (silently skip failures)
   let fullReference = referenceText;
-  if (referenceUrls.length > 0) {
-    const scraped = await Promise.allSettled(
-      referenceUrls.filter(u => u?.trim()).map(u => scrapeUrl(u.trim()))
-    );
-    const scrapedText = scraped
-      .filter(r => r.status === "fulfilled")
-      .map(r => r.value)
-      .join("\n\n---\n\n");
-    if (scrapedText) {
-      fullReference = [referenceText, scrapedText].filter(Boolean).join("\n\n");
+  const validUrls = (referenceUrls || []).filter(u => u?.trim());
+  if (validUrls.length > 0) {
+    try {
+      const scraped = await Promise.allSettled(
+        validUrls.map(u => scrapeUrl(u.trim()))
+      );
+      const scrapedText = scraped
+        .filter(r => r.status === "fulfilled" && r.value?.trim())
+        .map(r => r.value)
+        .join("\n\n---\n\n");
+      if (scrapedText) {
+        fullReference = [referenceText, scrapedText].filter(Boolean).join("\n\n");
+      }
+    } catch (err) {
+      console.warn("Scraping failed, continuing without reference:", err.message);
     }
   }
 
