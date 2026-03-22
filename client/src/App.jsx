@@ -568,11 +568,30 @@ function AdminPage({ onLeave }) {
   const [shake,     setShake]     = useState(false);
   const [showPass,  setShowPass]  = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [localMode, setLocalMode] = useState(false);  // true = use local AI proxy
+  const [localOk,   setLocalOk]   = useState(null);   // null=unchecked, true=up, false=down
   const [themes,    setThemes]    = useState([]);
   const [editing,   setEditing]   = useState(null);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState(null);
   const [success,   setSuccess]   = useState(null);
+
+  const LOCAL_PROXY = "http://localhost:7654";
+
+  // Check if local proxy is running
+  async function checkLocalProxy() {
+    try {
+      const r = await fetch(`${LOCAL_PROXY}/health`, { signal: AbortSignal.timeout(2000) });
+      const d = await r.json();
+      setLocalOk(d.ok === true);
+      setLocalMode(d.ok === true);
+      return d.ok === true;
+    } catch {
+      setLocalOk(false);
+      setLocalMode(false);
+      return false;
+    }
+  }
 
   const [form, setForm] = useState({
     name:"", category:"anime", seedWords:"", referenceText:"",
@@ -610,19 +629,64 @@ function AdminPage({ onLeave }) {
 
   async function handleGenerate() {
     setGenerating(true); setError(null); setGenResult(null);
-    const res = await api.post("/admin/generate", {
-      passcode,
-      themeName:     form.name,
-      category:      form.category,
-      seedWords:     form.seedWords.split(",").map(s=>s.trim()).filter(Boolean),
-      referenceText: form.referenceText,
-      referenceUrls: form.referenceUrls.filter(u=>u.trim()),
-      modelChoice:   form.modelChoice,
-    }).catch(e=>({error:e.message}));
+
+    let res;
+    if (localMode) {
+      // Use local proxy — build prompt client-side and send directly
+      const prompt = buildLocalPrompt(form);
+      try {
+        const r = await fetch(`${LOCAL_PROXY}/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passcode, model: "qwen-90k:latest", prompt }),
+          signal: AbortSignal.timeout(120_000),
+        });
+        res = await r.json();
+        if (!r.ok) res = { error: res.error || "Local proxy error" };
+      } catch(e) {
+        res = { error: `Local proxy unreachable: ${e.message}` };
+      }
+    } else {
+      // Use Railway server
+      res = await api.post("/admin/generate", {
+        passcode,
+        themeName:     form.name,
+        category:      form.category,
+        seedWords:     form.seedWords.split(",").map(s=>s.trim()).filter(Boolean),
+        referenceText: form.referenceText,
+        referenceUrls: form.referenceUrls.filter(u=>u.trim()),
+        modelChoice:   form.modelChoice,
+      }).catch(e=>({error:e.message}));
+    }
+
     setGenerating(false);
     if (res.error) return setError(res.error);
     setGenResult(res);
     setForm(f=>({...f, words: res.words||[]}));
+  }
+
+  // Build prompt for local proxy (same logic as server)
+  function buildLocalPrompt(form) {
+    const guides = {
+      anime:"Characters, abilities/jutsu, locations, organisations, items. Proper nouns only.",
+      game:"Characters, weapons, maps/zones, items, named abilities. Proper nouns only.",
+      show:"Characters, locations, items, organisations. Proper nouns only.",
+      animal:"Species names, habitats, traits, behaviours, taxonomic groups.",
+      food:"Named dishes, specific ingredients, cooking techniques, cuisines.",
+      general:"Proper nouns, named entities, specific concepts related to the theme.",
+    };
+    const guide = guides[form.category] || guides.general;
+    const seed  = form.seedWords ? `Seed words (must include): ${form.seedWords}` : "No seed words.";
+    const ref   = form.referenceText ? `\nReference:\n${form.referenceText.slice(0,8000)}` : "";
+    return `You are generating a word pool for an Imposter Word Game.
+Theme: ${form.name} | Category: ${form.category}
+Word types: ${guide}
+${seed}${ref}
+
+Generate exactly 50 words split into categories relevant to this theme.
+Rules: Output ONLY valid JSON, no markdown, lowercase, hyphens for compound names, proper nouns only.
+Format: {"theme":"${form.name}","words":["word1","word2",...]}
+JSON:`;
   }
 
   async function handleSave() {
@@ -856,6 +920,27 @@ function AdminPage({ onLeave }) {
                   placeholder="Paste any extra character lists, lore, etc." rows={3} />
               </div>
 
+
+              {/* Local AI mode toggle */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                padding:"8px 12px",background:"var(--bg)",border:`1px solid ${localOk===true?"var(--green)":localOk===false?"var(--accent)":"var(--border)"}`,
+                borderRadius:6,marginBottom:8}}>
+                <div>
+                  <div style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)",letterSpacing:1}}>LOCAL AI MODE</div>
+                  <div style={{fontSize:11,color:localOk===true?"var(--green)":localOk===false?"var(--accent)":"var(--muted)"}}>
+                    {localOk===null ? "Click to check" : localOk ? "Proxy running — using local" : "Proxy offline — using Railway"}
+                  </div>
+                </div>
+                <button className={`badge ${localMode?"badge--green":""}`}
+                  style={{cursor:"pointer",border:"none",padding:"5px 10px"}}
+                  onClick={async()=>{
+                    if(localOk===null){ await checkLocalProxy(); return; }
+                    if(localOk){ setLocalMode(m=>!m); }
+                    else { await checkLocalProxy(); }
+                  }}>
+                  {localOk===null ? "CHECK" : localMode ? "ON" : "OFF"}
+                </button>
+              </div>
 
               <button className="btn btn--yellow" disabled={generating||!form.name} onClick={handleGenerate}>
                 {generating ? <><span className="spin"/>Generating…</> : "Generate with AI"}
