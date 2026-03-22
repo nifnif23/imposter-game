@@ -149,9 +149,81 @@ app.delete("/admin/theme/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+
+// ── REST: Admin — scrape a URL for reference text ────────────
+// Fetches a webpage and strips it to plain text for use as AI reference
+app.post("/admin/scrape", async (req, res) => {
+  const { passcode, url } = req.body;
+  if (passcode !== ADMIN_PASS) return res.status(403).json({ error: "Invalid passcode" });
+  if (!url?.trim())            return res.status(400).json({ error: "URL required" });
+
+  try {
+    const text = await scrapeUrl(url.trim());
+    res.json({ text, url, length: text.length });
+  } catch (err) {
+    console.error("Scrape error:", err.message);
+    res.status(500).json({ error: `Could not fetch page: ${err.message}` });
+  }
+});
+
+// ── Helper: fetch a URL and extract readable plain text ───────
+async function scrapeUrl(url) {
+  // Validate URL
+  const parsed = new URL(url); // throws if invalid
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("Only HTTP/HTTPS URLs are supported");
+  }
+
+  const resp = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; ImposterGameBot/1.0)",
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    signal: AbortSignal.timeout(15_000),
+    redirect: "follow",
+  });
+
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+  const html = await resp.text();
+
+  // Strip HTML tags and extract readable text
+  let text = html
+    // Remove script and style blocks entirely
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+    .replace(/<header[\s\S]*?<\/header>/gi, " ")
+    .replace(/<aside[\s\S]*?<\/aside>/gi, " ")
+    // Convert common block elements to newlines
+    .replace(/<(br|p|div|h[1-6]|li|tr)[^>]*>/gi, "\n")
+    // Strip remaining tags
+    .replace(/<[^>]+>/g, " ")
+    // Decode common HTML entities
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#\d+;/g, " ")
+    // Collapse whitespace
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  // Limit to 60k chars (well within 90k context)
+  // Focus on the first chunk which usually has the most relevant content
+  if (text.length > 60000) text = text.slice(0, 60000) + "\n[truncated]";
+
+  return text;
+}
+
 // ── REST: Admin — generate theme with AI ─────────────────────
 app.post("/admin/generate", async (req, res) => {
-  const { passcode, themeName, category, seedWords = [], referenceText = "", modelChoice = "fast" } = req.body;
+  const { passcode, themeName, category, seedWords = [], referenceText = "", referenceUrls = [], modelChoice = "fast" } = req.body;
   if (passcode !== ADMIN_PASS) return res.status(403).json({ error: "Invalid passcode" });
   if (!themeName?.trim())      return res.status(400).json({ error: "Theme name required" });
 
@@ -160,8 +232,23 @@ app.post("/admin/generate", async (req, res) => {
   const { data: cached } = await supabase.from("ai_cache").select("*").eq("cache_key", cacheKey).single();
   if (cached) return res.json({ ...cached.result, cached: true });
 
+  // Scrape any reference URLs and append to referenceText
+  let fullReference = referenceText;
+  if (referenceUrls.length > 0) {
+    const scraped = await Promise.allSettled(
+      referenceUrls.filter(u => u?.trim()).map(u => scrapeUrl(u.trim()))
+    );
+    const scrapedText = scraped
+      .filter(r => r.status === "fulfilled")
+      .map(r => r.value)
+      .join("\n\n---\n\n");
+    if (scrapedText) {
+      fullReference = [referenceText, scrapedText].filter(Boolean).join("\n\n");
+    }
+  }
+
   // Build prompt
-  const { model, prompt } = buildPrompt(modelChoice, { themeName: themeName.trim(), category, seedWords, referenceText });
+  const { model, prompt } = buildPrompt(modelChoice, { themeName: themeName.trim(), category, seedWords, referenceText: fullReference });
 
   // Call local AI model via Ollama API
   try {
@@ -180,10 +267,12 @@ app.post("/admin/generate", async (req, res) => {
     if (!Array.isArray(parsed.words))
       throw new Error("AI returned invalid structure");
 
+    const scrapedCount = referenceUrls.filter(u => u?.trim()).length;
     const result = {
-      theme:       parsed.theme || themeName,
-      words:       parsed.words.map(w => String(w).toLowerCase().trim()).filter(Boolean),
+      theme:        parsed.theme || themeName,
+      words:        parsed.words.map(w => String(w).toLowerCase().trim()).filter(Boolean),
       model,
+      scraped_urls: scrapedCount,
       generated_at: new Date().toISOString(),
     };
 
@@ -482,7 +571,7 @@ io.on("connection", (socket) => {
       }
 
       io.to(code).emit("room_update", roomPublicState(room));
-    }, 30_000);
+    }, 120_000); // 2 min grace for reload/reconnect
 
     console.log(`[~] ${socket.id} disconnected`);
   });

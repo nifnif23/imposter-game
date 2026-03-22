@@ -576,6 +576,7 @@ function AdminPage({ onLeave }) {
 
   const [form, setForm] = useState({
     name:"", category:"anime", seedWords:"", referenceText:"",
+    referenceUrls:[""],
     words:[],
   });
   const [genResult, setGenResult] = useState(null);
@@ -615,6 +616,7 @@ function AdminPage({ onLeave }) {
       category:      form.category,
       seedWords:     form.seedWords.split(",").map(s=>s.trim()).filter(Boolean),
       referenceText: form.referenceText,
+      referenceUrls: form.referenceUrls.filter(u=>u.trim()),
       modelChoice:   form.modelChoice,
     }).catch(e=>({error:e.message}));
     setGenerating(false);
@@ -635,7 +637,7 @@ function AdminPage({ onLeave }) {
     setSuccess("Theme saved!");
     loadThemes();
     setEditing(null);
-    setForm({name:"",category:"anime",seedWords:"",referenceText:"",words:[]});
+    setForm({name:"",category:"anime",seedWords:"",referenceText:"",referenceUrls:[""],words:[]});
     setGenResult(null);
   }
 
@@ -651,7 +653,7 @@ function AdminPage({ onLeave }) {
     setForm({
       name: theme.name, category: theme.category||"anime",
       seedWords:"", referenceText:"", modelChoice:"fast",
-      words: theme.words||[],
+      words: theme.words||[], referenceUrls:[""],
     });
     // Load full theme data for words
     api.get(`/themes`).then(ts => {
@@ -739,7 +741,7 @@ function AdminPage({ onLeave }) {
             </button>
             <button className="btn btn--green btn--sm" onClick={()=>{
               setEditing({id:null});
-              setForm({name:"",category:"anime",seedWords:"",referenceText:"",words:[]});
+              setForm({name:"",category:"anime",seedWords:"",referenceText:"",referenceUrls:[""],words:[]});
               setGenResult(null);
             }}>+ New Theme</button>
           </div>
@@ -821,9 +823,37 @@ function AdminPage({ onLeave }) {
                   placeholder="gojo, sukuna, yuji" />
               </div>
               <div className="field">
-                <label>Reference Text (paste wiki / fandom text)</label>
+                <label>Reference URLs (fandom wiki, etc.)</label>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {form.referenceUrls.map((url, i) => (
+                    <div key={i} style={{display:"flex",gap:6}}>
+                      <input
+                        value={url}
+                        onChange={e=>{
+                          const urls = [...form.referenceUrls];
+                          urls[i] = e.target.value;
+                          setForm(f=>({...f, referenceUrls: urls}));
+                        }}
+                        placeholder="https://kimetsu-no-yaiba.fandom.com/wiki/..."
+                        style={{flex:1, fontSize:12}}
+                      />
+                      {form.referenceUrls.length > 1 && (
+                        <button className="btn btn--danger btn--sm" onClick={()=>{
+                          setForm(f=>({...f, referenceUrls: f.referenceUrls.filter((_,j)=>j!==i)}));
+                        }}>x</button>
+                      )}
+                    </div>
+                  ))}
+                  <button className="btn btn--ghost btn--sm" style={{width:"auto",alignSelf:"flex-start"}}
+                    onClick={()=>setForm(f=>({...f, referenceUrls:[...f.referenceUrls,""]}))}>
+                    + Add URL
+                  </button>
+                </div>
+              </div>
+              <div className="field">
+                <label>Extra Reference Text (optional — paste additional wiki text)</label>
                 <textarea value={form.referenceText} onChange={e=>setForm(f=>({...f,referenceText:e.target.value}))}
-                  placeholder="Paste character lists, wiki excerpts, etc." rows={4} />
+                  placeholder="Paste any extra character lists, lore, etc." rows={3} />
               </div>
 
 
