@@ -1188,10 +1188,8 @@ function SoloTestPage({ onLeave }) {
       };
     });
 
-    setTimeout(() => {
-      setResult({ assignments, mainWord, impWord, pool: pool.slice(0, 10), theme: theme?.name || "default" });
-      setLoading(false);
-    }, 400);
+    setResult({ assignments, mainWord, impWord, pool: pool.slice(0, 10), theme: fullTheme?.name || "default" });
+    setLoading(false);
   }
 
   return (
