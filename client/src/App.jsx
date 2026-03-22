@@ -152,7 +152,11 @@ function HomePage({ game, onEnter, onAdmin, onSoloTest, initialCode="" }) {
       {mode === "home" && (
         <>
           <div style={{textAlign:"center", marginBottom:36}}>
-            <div className="logo">
+            <div className="logo" onClick={()=>{
+              const n = (window.__lc = (window.__lc||0)+1);
+              if(n>=5){ window.__lc=0; onSoloTest(); return; }
+              setTimeout(()=>{ if(window.__lc===n) window.__lc=0; },1500);
+            }} style={{cursor:"default",userSelect:"none"}}>
               IMP<span className="logo__accent">O</span>STER
               <span className="logo__cursor" />
             </div>
@@ -1115,8 +1119,26 @@ function SoloTestPage({ onLeave }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`${SERVER}/themes`).then(r=>r.json()).then(t=>setThemes(Array.isArray(t)?t:[])).catch(()=>{});
+    fetch(`${SERVER}/themes`)
+      .then(r=>r.json())
+      .then(t=>setThemes(Array.isArray(t)?t:[]))
+      .catch(()=>{});
   }, []);
+
+  // When a theme is selected, fetch its full word list
+  useEffect(() => {
+    if (!themeId) return;
+    const existing = themes.find(t => t.id === themeId);
+    if (existing?.words?.length) return; // already have words
+    fetch(`${SERVER}/themes/${themeId}`)
+      .then(r=>r.json())
+      .then(data => {
+        if (data?.words) {
+          setThemes(prev => prev.map(t => t.id === themeId ? {...t, words: data.words} : t));
+        }
+      })
+      .catch(()=>{});
+  }, [themeId]);
 
   // Simulate role assignment locally (mirrors server logic exactly)
   function simulate() {

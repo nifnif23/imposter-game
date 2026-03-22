@@ -118,6 +118,17 @@ async function fetchTheme(themeId) {
   return data;
 }
 
+// ── REST: Get single theme by ID (public — for solo test mode) ─
+app.get("/themes/:id", async (req, res) => {
+  const { data, error } = await supabase
+    .from("themes")
+    .select("id, name, category, words, word_count")
+    .eq("id", req.params.id)
+    .single();
+  if (error) return res.status(404).json({ error: "Theme not found" });
+  res.json(data);
+});
+
 // ── REST: Admin — save theme ──────────────────────────────────
 app.post("/admin/theme", async (req, res) => {
   const { passcode, id, name, category, words, imposters } = req.body;
