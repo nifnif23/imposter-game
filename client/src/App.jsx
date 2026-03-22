@@ -1142,7 +1142,7 @@ function SoloTestPage({ onLeave }) {
   function simulate() {
     setLoading(true);
     const pool = fullTheme?.words?.length
-      ? theme.words
+      ? fullTheme.words
       : ["kettle","mirror","pillow","blanket","curtain","ladder","bucket","candle","drawer","fridge",
         "toaster","scissors","hammer","stapler","envelope","calendar","remote","charger","umbrella","suitcase",
         "doorbell","mailbox","bathtub","carpet","chimney","cupboard","wardrobe","pizza","burger","sushi",
