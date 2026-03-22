@@ -86,7 +86,7 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: 24px 16px;
+  padding: 20px 14px;
   animation: fadeUp .3s ease both;
 }
 
@@ -95,7 +95,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 28px 24px;
+  padding: 20px 16px;
   width: 100%;
   max-width: 420px;
 }
@@ -105,8 +105,8 @@ body {
 .logo {
   font-family: var(--display);
   font-weight: 800;
-  font-size: clamp(48px, 11vw, 76px);
-  letter-spacing: -2px;
+  font-size: clamp(36px, 9vw, 76px);
+  letter-spacing: -1px;
   line-height: 1;
   color: var(--text);
   position: relative;
@@ -114,9 +114,9 @@ body {
 .logo__accent { color: var(--accent); }
 .logo__sub {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   margin-top: 6px;
   text-transform: uppercase;
 }
@@ -167,7 +167,7 @@ input, select, textarea {
   border-radius: var(--r);
   color: var(--text);
   font-family: var(--body);
-  font-size: 15px;
+  font-size: 16px;
   padding: 10px 13px;
   outline: none;
   transition: border-color .15s;
@@ -433,10 +433,17 @@ pre.prompt-box {
 .settings-row select { max-width: 180px; }
 
 /* Connection indicator */
-.conn { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10px; }
+.conn { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.5px; }
 .conn .dot { width: 6px; height: 6px; border-radius: 50%; }
 .conn--on  .dot { background: var(--green); animation: pulse 2s infinite; }
 .conn--off .dot { background: var(--accent); }
+
+@media (max-width: 400px) {
+  .logo { font-size: 32px; letter-spacing: -1px; }
+  .logo__sub { font-size: 9px; letter-spacing: 1.5px; }
+  .card { padding: 16px 14px; }
+  h2 { font-size: 22px; }
+}
 
 @media (min-width: 640px) {
   .card { padding: 34px 30px; }

@@ -30,7 +30,7 @@ export default function App() {
 function ConnBadge({ connected }) {
   return (
     <div className={`conn ${connected ? "conn--on" : "conn--off"}`}
-      style={{position:"fixed", top:10, right:14, zIndex:50}}>
+      style={{position:"fixed", bottom:14, right:14, zIndex:50, background:"var(--bg)", padding:"4px 8px", borderRadius:4, border:"1px solid var(--border)"}}>
       <div className="dot" />
       <span>{connected ? "live" : "reconnecting…"}</span>
     </div>
@@ -596,13 +596,7 @@ function AdminPage({ onLeave }) {
                 <textarea value={form.referenceText} onChange={e=>setForm(f=>({...f,referenceText:e.target.value}))}
                   placeholder="Paste character lists, wiki excerpts, etc." rows={4} />
               </div>
-              <div className="field">
-                <label>AI Model</label>
-                <select value={form.modelChoice} onChange={e=>setForm(f=>({...f,modelChoice:e.target.value}))}>
-                  <option value="fast">Fast — qwen2.5:latest (4B, large context)</option>
-                  <option value="hq">High Quality — qwen2.5:7b</option>
-                </select>
-              </div>
+
 
               <button className="btn btn--yellow" disabled={generating||!form.name} onClick={handleGenerate}>
                 {generating ? <><span className="spin"/>Generating…</> : "✨ Generate with AI"}
@@ -713,7 +707,7 @@ JSON only:`;
       </button>
       {show && (
         <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:10}}>
-          {[["qwen2.5:latest (fast)", fast, "fast"],["qwen2.5:7b (hq)", hq, "hq"]].map(([label, prompt, key])=>(
+          {[["qwen-90k (qwen3.5:4b — 90k context)", fast, "fast"]].map(([label, prompt, key])=>(
             <div key={key} style={{border:"1px solid var(--border)",borderRadius:6,overflow:"hidden"}}>
               <div style={{padding:"6px 10px",background:"var(--bg)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--green)",letterSpacing:1}}>{label}</span>
