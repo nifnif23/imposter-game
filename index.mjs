@@ -500,9 +500,8 @@ io.on("connection", (socket) => {
     for (const [playerId, assignment] of Object.entries(assignments)) {
       const player = room.players.get(playerId);
       if (player) {
-        // Find the socket for this player
-        const targetSocket = io.sockets.sockets.get(player.socketId);
-        if (targetSocket) targetSocket.emit("your_assignment", assignment);
+        // Emit to the socket's own private room (socket.id is always a valid room)
+        io.to(player.socketId).emit("your_assignment", assignment);
       }
     }
 
@@ -523,6 +522,21 @@ io.on("connection", (socket) => {
     io.to(code).emit("room_update", roomPublicState(room));
     io.to(code).emit("game_reset");
     cb?.({ ok: true });
+  });
+
+  // ── GET ASSIGNMENT (any player can request their own word) ─
+  socket.on("get_assignment", (_, cb) => {
+    const code = socket.data.roomCode;
+    const pid  = socket.data.playerId;
+    const room = rooms.get(code);
+    if (!room || !room.gameState.started) return cb?.({ error: "No active game" });
+    const assignment = room.gameState.assignments[pid];
+    if (assignment) {
+      socket.emit("your_assignment", assignment);
+      cb?.({ ok: true });
+    } else {
+      cb?.({ error: "No assignment found" });
+    }
   });
 
   // ── HOST: REVEAL WORDS (host only, after discussion) ─────

@@ -50,6 +50,10 @@ export function useGame() {
     const onAssignment = (data) => setAssignment(data);
     const onRevealed   = (data) => setRevealed(data);
     const onReset      = ()     => { setAssignment(null); setRevealed(null); };
+    // When game starts, immediately request our assignment
+    const onGameStarted = () => {
+      socket.emit("get_assignment", {}, () => {});
+    };
 
     socket.on("connect",        onConnect);
     socket.on("disconnect",     onDisconnect);
@@ -57,6 +61,7 @@ export function useGame() {
     socket.on("your_assignment",onAssignment);
     socket.on("words_revealed", onRevealed);
     socket.on("game_reset",     onReset);
+    socket.on("game_started",   onGameStarted);
 
     return () => {
       socket.off("connect",        onConnect);
@@ -65,6 +70,7 @@ export function useGame() {
       socket.off("your_assignment",onAssignment);
       socket.off("words_revealed", onRevealed);
       socket.off("game_reset",     onReset);
+      socket.off("game_started",   onGameStarted);
     };
   }, []);
 
