@@ -254,7 +254,11 @@ app.post("/admin/generate", async (req, res) => {
   try {
     const aiRes = await fetch(`${AI_BASE_URL}/api/generate`, {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",  // bypass ngrok browser warning page
+        "User-Agent": "ImposterGameServer/1.0",
+      },
       body:    JSON.stringify({ model, prompt, stream: false }),
       signal:  AbortSignal.timeout(90_000),
     });
