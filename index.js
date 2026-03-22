@@ -18,7 +18,9 @@ const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...ar
 const PORT          = process.env.PORT          || 3001;
 const ADMIN_PASS    = process.env.ADMIN_PASSCODE || "changeme";
 const AI_BASE_URL   = process.env.AI_BASE_URL    || "http://localhost:11434";
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN  || "http://localhost:5173";
+// Support multiple origins separated by commas e.g. "https://a.vercel.app,https://b.vercel.app"
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
+  .split(",").map(o => o.trim().replace(//+$/, ""));
 
 // ── Supabase (server-side, uses service key — never expose to client) ──
 const supabase = createClient(
@@ -30,12 +32,12 @@ const supabase = createClient(
 const app    = express();
 const server = createServer(app);
 
-app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
+app.use(cors({ origin: CLIENT_ORIGINS, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
 // ── Socket.IO setup ───────────────────────────────────────────
 const io = new Server(server, {
-  cors: { origin: CLIENT_ORIGIN, methods: ["GET","POST"], credentials: true }
+  cors: { origin: CLIENT_ORIGINS, methods: ["GET","POST"], credentials: true }
 });
 
 // ── In-memory room store ──────────────────────────────────────
@@ -57,10 +59,14 @@ function makeCode() {
   return code;
 }
 
-function assignRoles(playerIds, mainWords, imposterWords, imposterCount, mode) {
-  const mainWord     = mainWords[Math.floor(Math.random() * mainWords.length)];
-  const filtered     = imposterWords.filter(w => w !== mainWord);
-  const imposterWord = (filtered.length ? filtered : imposterWords)[Math.floor(Math.random() * (filtered.length || imposterWords.length))];
+function assignRoles(playerIds, wordPool, imposterCount, mode) {
+  // Pick crewmate word
+  const mainWord = wordPool[Math.floor(Math.random() * wordPool.length)];
+  // Pick a DIFFERENT word from the same pool for the imposter
+  const remaining = wordPool.filter(w => w !== mainWord);
+  const imposterWord = remaining.length
+    ? remaining[Math.floor(Math.random() * remaining.length)]
+    : mainWord; // fallback if only 1 word in pool
 
   const shuffled    = [...playerIds].sort(() => Math.random() - 0.5);
   const imposterSet = new Set(shuffled.slice(0, imposterCount));
@@ -119,13 +125,11 @@ app.post("/admin/theme", async (req, res) => {
   if (!name?.trim())           return res.status(400).json({ error: "Name required" });
 
   const payload = {
-    name:          name.trim(),
-    category:      category || "general",
-    words:         (words    || []).map(w => String(w).toLowerCase().trim()).filter(Boolean),
-    imposters:     (imposters|| []).map(w => String(w).toLowerCase().trim()).filter(Boolean),
-    word_count:    (words    || []).length,
-    imposter_count:(imposters|| []).length,
-    updated_at:    new Date().toISOString(),
+    name:       name.trim(),
+    category:   category || "general",
+    words:      (words || []).map(w => String(w).toLowerCase().trim()).filter(Boolean),
+    word_count: (words || []).length,
+    updated_at: new Date().toISOString(),
   };
 
   const { data, error } = id
@@ -173,13 +177,12 @@ app.post("/admin/generate", async (req, res) => {
     const text = (raw.response || raw.content || "").replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(text);
 
-    if (!Array.isArray(parsed.words) || !Array.isArray(parsed.imposters))
+    if (!Array.isArray(parsed.words))
       throw new Error("AI returned invalid structure");
 
     const result = {
-      theme:     parsed.theme || themeName,
-      words:     parsed.words.map(w => String(w).toLowerCase().trim()).filter(Boolean),
-      imposters: parsed.imposters.map(w => String(w).toLowerCase().trim()).filter(Boolean),
+      theme:       parsed.theme || themeName,
+      words:       parsed.words.map(w => String(w).toLowerCase().trim()).filter(Boolean),
       model,
       generated_at: new Date().toISOString(),
     };
@@ -206,33 +209,34 @@ const GUIDELINES = {
 
 function buildPrompt(modelChoice, { themeName, category, seedWords, referenceText }) {
   const guide       = GUIDELINES[category] || GUIDELINES.general;
-  const seedSection = seedWords.length ? `Seed words (include if valid): ${seedWords.join(", ")}` : "No seed words.";
+  const seedSection = seedWords.length ? `Seed words (must include if valid): ${seedWords.join(", ")}` : "No seed words provided.";
+  const refSection  = referenceText.trim() ? `\n--- REFERENCE MATERIAL ---\n${referenceText.trim()}\n--- END REFERENCE ---` : "";
 
-  if (modelChoice === "fast") {
-    const refSection = referenceText.trim() ? `\n--- REFERENCE ---\n${referenceText.trim()}\n--- END ---` : "";
-    return {
-      model: "qwen2.5:latest",
-      prompt: `You are a word-list curator for an online multiplayer Imposter Word Game.
-Theme: ${themeName} | Category: ${category}
-Guidelines: ${guide}
-${seedSection}${refSection}
-Output ONLY valid JSON (no markdown, no fences):
-{"theme":"${themeName}","words":[30-50 proper nouns],"imposters":[15-25 different nouns from same theme]}
-No overlap between arrays. Lowercase. Hyphens for compound words.
-JSON:`,
-    };
-  }
-
-  // HQ model — tighter context
-  const clipped = referenceText.trim().slice(0, 3000);
+  // Single pool prompt — all words go in one array, game picks two different ones each round
   return {
-    model: "qwen2.5:7b",
-    prompt: `TASK: Imposter Word Game word list. JSON only.
-Theme: ${themeName} | Category: ${category}
-Types: ${guide}
-${seedSection}${clipped ? `\nReference: ${clipped}` : ""}
-Format: {"theme":"${themeName}","words":[20-35 nouns],"imposters":[10-18 nouns]}
-No overlap, lowercase, proper nouns, no markdown.
+    model: "qwen-90k",
+    prompt: `You are generating a word pool for an Imposter Word Game.
+In this game, all players get a word from the same pool. Crewmates share one word, the imposter gets a DIFFERENT word from the same pool. So all words must be from the same theme but distinct enough that having a different word would be noticeable.
+
+Theme: ${themeName}
+Category: ${category}
+Word types to include: ${guide}
+${seedSection}${refSection}
+
+Generate exactly 50 words split into these categories:
+- 15 character/person names (specific, canonical)
+- 10 location/place names (specific, named)
+- 10 ability/technique/move names (named, not generic)
+- 8 item/weapon/object names (specific, named)
+- 7 organisation/group/faction names
+
+Rules:
+- Output ONLY valid JSON, no markdown, no explanation
+- All words lowercase, hyphens for compound names
+- Proper nouns only — no generic words like sword or power
+- Must be canon/official entries for this theme
+- Format: {theme:${themeName},words:[word1,word2,...]}
+
 JSON:`,
   };
 }
@@ -341,20 +345,18 @@ io.on("connection", (socket) => {
     if (room.gameState.started) return cb?.({ error: "Already started" });
     if (room.players.size < 3)  return cb?.({ error: "Need at least 3 players" });
 
-    // Load theme words
-    let mainWords     = ["apple","banana","cherry","dragon","eagle"];
-    let imposterWords = ["apricot","blueberry","coconut","dolphin","falcon"];
+    // Load theme words — single pool, both roles draw from it
+    let wordPool = ["apple","banana","cherry","dragon","eagle","falcon","grape","harbor","island","jungle"];
 
     if (room.settings.themeId) {
       const theme = await fetchTheme(room.settings.themeId);
-      if (theme?.words?.length)     mainWords     = theme.words;
-      if (theme?.imposters?.length) imposterWords = theme.imposters;
+      if (theme?.words?.length) wordPool = theme.words;
     }
 
     const playerIds     = [...room.players.keys()];
     const imposterCount = Math.min(room.settings.imposters, Math.floor(playerIds.length / 2));
     const { assignments, mainWord, imposterWord } = assignRoles(
-      playerIds, mainWords, imposterWords, imposterCount, room.settings.mode
+      playerIds, wordPool, imposterCount, room.settings.mode
     );
 
     room.gameState = { started: true, assignments, mainWord, imposterWord, roundStartedAt: Date.now() };

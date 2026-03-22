@@ -234,7 +234,7 @@ function LobbyPage({ game, onLeave }) {
                       onClick={()=>setSettings(s=>({...s,themeId:t.id}))}>
                       <div>
                         <div className="theme-card__name">{t.name}</div>
-                        <div className="theme-card__meta">{t.category} · {t.word_count}w / {t.imposter_count}i</div>
+                        <div className="theme-card__meta">{t.category} · {t.word_count} words</div>
                       </div>
                       {settings.themeId===t.id && <span style={{color:"var(--green)"}}>✓</span>}
                     </div>
@@ -433,7 +433,7 @@ function AdminPage({ onLeave }) {
 
   const [form, setForm] = useState({
     name:"", category:"anime", seedWords:"", referenceText:"",
-    modelChoice:"fast", words:[], imposters:[],
+    words:[],
   });
   const [genResult, setGenResult] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -463,7 +463,7 @@ function AdminPage({ onLeave }) {
     setGenerating(false);
     if (res.error) return setError(res.error);
     setGenResult(res);
-    setForm(f=>({...f, words: res.words||[], imposters: res.imposters||[]}));
+    setForm(f=>({...f, words: res.words||[]}));
   }
 
   async function handleSave() {
@@ -471,14 +471,14 @@ function AdminPage({ onLeave }) {
     const res = await api.post("/admin/theme", {
       passcode, id: editing?.id,
       name: form.name, category: form.category,
-      words: form.words, imposters: form.imposters,
+      words: form.words,
     }).catch(e=>({error:e.message}));
     setLoading(false);
     if (res.error) return setError(res.error);
     setSuccess("Theme saved!");
     loadThemes();
     setEditing(null);
-    setForm({name:"",category:"anime",seedWords:"",referenceText:"",modelChoice:"fast",words:[],imposters:[]});
+    setForm({name:"",category:"anime",seedWords:"",referenceText:"",words:[]});
     setGenResult(null);
   }
 
@@ -494,7 +494,7 @@ function AdminPage({ onLeave }) {
     setForm({
       name: theme.name, category: theme.category||"anime",
       seedWords:"", referenceText:"", modelChoice:"fast",
-      words: theme.words||[], imposters: theme.imposters||[],
+      words: theme.words||[],
     });
     // Load full theme data for words
     api.get(`/themes`).then(ts => {
@@ -537,7 +537,7 @@ function AdminPage({ onLeave }) {
           <h2 style={{marginBottom:0}}>Theme Manager</h2>
           <button className="btn btn--green btn--sm" onClick={()=>{
             setEditing({id:null});
-            setForm({name:"",category:"anime",seedWords:"",referenceText:"",modelChoice:"fast",words:[],imposters:[]});
+            setForm({name:"",category:"anime",seedWords:"",referenceText:"",words:[]});
             setGenResult(null);
           }}>+ New Theme</button>
         </div>
@@ -558,7 +558,7 @@ function AdminPage({ onLeave }) {
                 <div style={{flex:1}}>
                   <div style={{fontWeight:500,fontSize:14}}>{t.name}</div>
                   <div style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)"}}>
-                    {t.category} · {t.word_count}w / {t.imposter_count}i
+                    {t.category} · {t.word_count} words
                   </div>
                 </div>
                 <button className="btn btn--ghost btn--sm" onClick={()=>startEdit(t)}>Edit</button>
@@ -604,22 +604,19 @@ function AdminPage({ onLeave }) {
 
               {genResult && (
                 <div className="msg msg--success" style={{marginTop:8}}>
-                  ✓ {genResult.words?.length} words · {genResult.imposters?.length} imposter words
+                  ✓ {genResult.words?.length} words in pool
                   {genResult.cached ? " (cached)" : ` via ${genResult.model}`}
                 </div>
               )}
 
               {/* Word editors */}
-              {(form.words.length > 0 || form.imposters.length > 0) && (
+              {form.words.length > 0 && (
                 <div style={{marginTop:14}}>
-                  <WordEditor label={`Main Words (${form.words.length})`}
+                  <WordEditor label={`Word Pool (${form.words.length})`}
                     accent="var(--green)" words={form.words}
                     onRemove={w=>setForm(f=>({...f,words:f.words.filter(x=>x!==w)}))}
                     onAdd={w=>{w=w.trim().toLowerCase();if(w)setForm(f=>({...f,words:[...new Set([...f.words,w])]}));}} />
-                  <WordEditor label={`Imposter Words (${form.imposters.length})`}
-                    accent="var(--accent)" words={form.imposters}
-                    onRemove={w=>setForm(f=>({...f,imposters:f.imposters.filter(x=>x!==w)}))}
-                    onAdd={w=>{w=w.trim().toLowerCase();if(w)setForm(f=>({...f,imposters:[...new Set([...f.imposters,w])]}));}} />
+
                 </div>
               )}
 
@@ -686,13 +683,13 @@ function PromptPreview({ form }) {
   const fast = `Theme: ${form.name} | Category: ${form.category}
 Guidelines: ${g}
 ${seed}${refClip?`\nReference: ${refClip}`:""}
-Output JSON: {"theme":"${form.name}","words":[30-50],"imposters":[15-25]}
+Output JSON: {"theme":"${form.name}","words":[50 words]}
 No overlap. Lowercase. No markdown. JSON:`;
 
   const hq = `Theme: ${form.name} | Category: ${form.category}
 Types: ${g}
 ${seed}${refClip?`\nRef: ${refClip}`:""}
-Format: {"theme":"${form.name}","words":[20-35],"imposters":[10-18]}
+Format: {"theme":"${form.name}","words":[50 words]}
 JSON only:`;
 
   function copy(text, key) {
