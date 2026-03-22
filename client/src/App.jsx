@@ -245,15 +245,28 @@ function LobbyPage({ game, onLeave }) {
     api.get("/themes").then(t => setThemes(Array.isArray(t) ? t : [])).catch(()=>{});
   }, []);
 
-  function share() {
+  function shareLink() {
     const url = `${window.location.origin}/room/${game.roomCode}`;
     const text = `Join my Imposter game! Code: ${game.roomCode}`;
     if (navigator.share) {
+      // Mobile — native share sheet
       navigator.share({ title: "Imposter", text, url }).catch(()=>{});
     } else {
-      navigator.clipboard.writeText(url).catch(()=>{});
-      setCopied("link");
-      setTimeout(() => setCopied(false), 2000);
+      // Desktop — copy link to clipboard
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied("link");
+        setTimeout(() => setCopied(null), 2000);
+      }).catch(() => {
+        // Fallback if clipboard API unavailable
+        const el = document.createElement("textarea");
+        el.value = url;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+        setCopied("link");
+        setTimeout(() => setCopied(null), 2000);
+      });
     }
   }
 
@@ -277,18 +290,29 @@ function LobbyPage({ game, onLeave }) {
         </div>
 
         {/* Room code + share */}
-        <div className="room-code bracket" onClick={share} title="Tap to share or copy">
+        <div className="room-code bracket" onClick={shareLink} title="Tap to share or copy">
           {roomCode}
         </div>
-        <div style={{display:"flex",gap:8,marginTop:6,marginBottom:16}}>
-          <button className="btn btn--ghost btn--sm" style={{flex:1,fontSize:11}} onClick={share}>
-            {copied === "link" ? "Copied!" : "Share link"}
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:6,marginBottom:16}}>
+          {/* Big share/copy link button */}
+          <button className="btn btn--primary" onClick={shareLink} style={{width:"100%",letterSpacing:1}}>
+            {copied === "link"
+              ? "Link copied!"
+              : navigator.share ? "Share invite link" : "Copy invite link"}
           </button>
-          <button className="btn btn--ghost btn--sm" style={{flex:1,fontSize:11}} onClick={()=>{
-            navigator.clipboard.writeText(game.roomCode).catch(()=>{});
-            setCopied("code"); setTimeout(()=>setCopied(false),2000);
-          }}>
-            {copied === "code" ? "Copied!" : "Copy code"}
+          {/* Thin copy code row */}
+          <button
+            onClick={()=>{
+              navigator.clipboard.writeText(game.roomCode).catch(()=>{});
+              setCopied("code"); setTimeout(()=>setCopied(null),2000);
+            }}
+            style={{
+              background:"none", border:"none", cursor:"pointer",
+              fontFamily:"var(--mono)", fontSize:11, color: copied==="code" ? "var(--green)" : "var(--muted)",
+              letterSpacing:1, padding:"4px 0", textAlign:"center",
+              transition:"color .2s",
+            }}>
+            {copied === "code" ? "code copied!" : `copy code only — ${game.roomCode}`}
           </button>
         </div>
 
@@ -391,8 +415,16 @@ function GameScreen({ game, onLeave }) {
             <span className="badge">{modeLabel}</span>
             <button className="btn btn--ghost btn--sm" style={{padding:"4px 10px"}} onClick={()=>{
               const url = `${window.location.origin}/room/${roomCode}`;
-              if (navigator.share) navigator.share({title:"Imposter",text:`Join code: ${roomCode}`,url}).catch(()=>{});
-              else navigator.clipboard.writeText(url).catch(()=>{});
+              if (navigator.share) {
+                navigator.share({title:"Imposter",text:`Join code: ${roomCode}`,url}).catch(()=>{});
+              } else {
+                navigator.clipboard.writeText(url).then(()=>{}).catch(()=>{
+                  const el = document.createElement("textarea");
+                  el.value = url; document.body.appendChild(el);
+                  el.select(); document.execCommand("copy");
+                  document.body.removeChild(el);
+                });
+              }
             }}>share</button>
           </div>
         </div>
