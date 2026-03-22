@@ -4,9 +4,19 @@ import { useGame } from "./useGame.js";
 // ── API helper (REST calls to our server) ─────────────────────
 const SERVER = import.meta.env.VITE_SERVER_URL || "";
 const api = {
-  get:    (path)       => fetch(`${SERVER}${path}`).then(r => r.json()),
-  post:   (path, body) => fetch(`${SERVER}${path}`, { method:"POST",   headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }).then(r => r.json()),
-  delete: (path, body) => fetch(`${SERVER}${path}`, { method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }).then(r => r.json()),
+  get: (path) => fetch(`${SERVER}${path}`).then(r => r.json()),
+  post: async (path, body) => {
+    const r = await fetch(`${SERVER}${path}`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (r.status === 403) throw new Error("Invalid passcode");
+    return data;
+  },
+  delete: async (path, body) => {
+    const r = await fetch(`${SERVER}${path}`, { method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (r.status === 403) throw new Error("Invalid passcode");
+    return data;
+  },
 };
 
 // ── Root App ──────────────────────────────────────────────────
@@ -419,8 +429,6 @@ function WordReveal({ assignment, onHide }) {
 // ═══════════════════════════════════════════════════════════════
 // PAGE: Admin
 // ═══════════════════════════════════════════════════════════════
-const ADMIN_PASS_LOCAL = "changeme"; // just for UI check — real check is server-side
-
 function AdminPage({ onLeave }) {
   const [authed,   setAuthed]   = useState(false);
   const [passcode, setPasscode] = useState("");
@@ -438,9 +446,18 @@ function AdminPage({ onLeave }) {
   const [genResult, setGenResult] = useState(null);
   const [generating, setGenerating] = useState(false);
 
-  function handleAuth() {
-    // Server will reject if wrong — this is just UX
+  async function handleAuth() {
     if (!passcode.trim()) return setAuthErr("Enter passcode");
+    setLoading(true); setAuthErr("");
+    try {
+      // Test the passcode server-side — wrong passcode returns 403 which throws
+      // Correct passcode returns 400 "Name required" which is fine — means auth passed
+      await api.post("/admin/theme", { passcode, name: "", words: [] });
+    } catch(e) {
+      setLoading(false);
+      if (e.message.includes("Invalid passcode")) return setAuthErr("Wrong passcode");
+    }
+    setLoading(false);
     setAuthed(true);
     loadThemes();
   }
