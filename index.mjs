@@ -346,7 +346,41 @@ io.on("connection", (socket) => {
     if (room.players.size < 3)  return cb?.({ error: "Need at least 3 players" });
 
     // Load theme words — single pool, both roles draw from it
-    let wordPool = ["apple","banana","cherry","dragon","eagle","falcon","grape","harbor","island","jungle"];
+    // Default pool — 300+ everyday nouns covering objects, places, animals, food, concepts
+    let wordPool = [
+      // Household objects
+      "kettle","mirror","pillow","blanket","curtain","ladder","bucket","candle","drawer","fridge",
+      "toaster","kettle","scissors","hammer","stapler","envelope","calendar","remote","charger","umbrella",
+      "suitcase","doorbell","mailbox","bathtub","shower","carpet","ceiling","chimney","cupboard","wardrobe",
+      // Food & drink
+      "pizza","burger","sushi","ramen","pasta","curry","steak","salmon","mango","avocado",
+      "croissant","waffle","pancake","brownie","pretzel","noodles","burrito","taco","dumpling","cheesecake",
+      "espresso","smoothie","lemonade","milkshake","cocktail","whiskey","cider","yoghurt","granola","omelette",
+      // Animals
+      "penguin","dolphin","elephant","giraffe","cheetah","gorilla","panther","flamingo","octopus","hedgehog",
+      "mongoose","raccoon","platypus","salamander","chameleon","pelican","vulture","meerkat","capybara","axolotl",
+      "hamster","parrot","iguana","tortoise","piranha","narwhal","walrus","manatee","wolverine","armadillo",
+      // Places
+      "library","airport","stadium","hospital","cathedral","lighthouse","cemetery","volcano","glacier","canyon",
+      "swamp","harbour","plateau","peninsula","archipelago","suburb","alleyway","rooftop","basement","greenhouse",
+      "warehouse","observatory","aquarium","monastery","colosseum","pyramid","fortress","marina","quarry","tundra",
+      // Vehicles & transport
+      "submarine","helicopter","motorcycle","skateboard","hovercraft","gondola","zeppelin","tractor","ambulance","bulldozer",
+      // Technology & objects
+      "telescope","microscope","calculator","projector","satellite","compass","thermometer","hourglass","periscope","barometer",
+      // Clothing & accessories
+      "tuxedo","kimono","sombrero","beret","gloves","scarf","boots","sandals","goggles","bracelet",
+      // Nature & weather
+      "lightning","avalanche","monsoon","tornado","blizzard","earthquake","tsunami","drought","rainbow","eclipse",
+      "stalactite","waterfall","geyser","quicksand","mangrove","cactus","bamboo","seaweed","mushroom","lichen",
+      // Sports & games
+      "archery","fencing","javelin","surfing","wrestling","bobsled","lacrosse","polo","cricket","badminton",
+      // Professions & roles
+      "blacksmith","surgeon","astronaut","detective","archaeologist","sommelier","cartographer","taxidermist","locksmith","falconer",
+      // Misc concepts & things
+      "compass","lantern","anchor","trophy","passport","blueprint","fossil","crystal","magnet","prism",
+      "vault","labyrinth","mirage","shipwreck","treasure","crown","sceptre","goblet","parchment","hourglass"
+    ];
 
     if (room.settings.themeId) {
       const theme = await fetchTheme(room.settings.themeId);
