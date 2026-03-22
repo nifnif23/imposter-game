@@ -114,7 +114,7 @@ app.get("/themes", async (_, res) => {
 
 // ── REST: Get single theme (server uses internally) ───────────
 async function fetchTheme(themeId) {
-  const { data } = await supabase.from("themes").select("*").eq("id", themeId).single();
+  const { data } = await supabase.from("themes").select("id, name, category, words, word_count, hints").eq("id", themeId).single();
   return data;
 }
 
@@ -122,7 +122,7 @@ async function fetchTheme(themeId) {
 app.get("/themes/:id", async (req, res) => {
   const { data, error } = await supabase
     .from("themes")
-    .select("id, name, category, words, word_count")
+    .select("id, name, category, words, word_count, hints")
     .eq("id", req.params.id)
     .single();
   if (error) return res.status(404).json({ error: "Theme not found" });

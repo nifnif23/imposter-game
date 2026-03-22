@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate } from "react-router-dom";
+
+// Format word for display — replace dashes with spaces, title case
+function fmt(word) {
+  if (!word) return "";
+  return word.replace(/-/g, " ");
+}
 import { useGame } from "./useGame.js";
 
 // ── API helper (REST calls to our server) ─────────────────────
@@ -438,8 +444,22 @@ function LobbyPage({ game, onLeave }) {
 function GameScreen({ game, onLeave }) {
   const [showWord,   setShowWord]   = useState(false);
   const { room, players, isHost, roomCode, assignment, revealed, error, loading } = game;
+  const [themeHints, setThemeHints] = useState({});
+  const SERVER = import.meta.env.VITE_SERVER_URL || "";
+
+  // Load hints for the current theme
+  useEffect(() => {
+    const themeId = room?.settings?.themeId;
+    if (!themeId) return;
+    fetch(`${SERVER}/themes/${themeId}`)
+      .then(r=>r.json())
+      .then(d=>{ if(d.hints) setThemeHints(d.hints); })
+      .catch(()=>{});
+  }, [room?.settings?.themeId]);
 
   const modeLabel = room?.settings?.mode === "known" ? "Known Imposter" : "Hidden Imposter";
+  // Get hint for the player's current word
+  const wordHint = assignment?.word ? themeHints[assignment.word] : null;
 
   return (
     <div className="page" style={{justifyContent:"flex-start",paddingTop:40}}>
@@ -480,7 +500,7 @@ function GameScreen({ game, onLeave }) {
             </button>
           </div>
         ) : (
-          <WordReveal assignment={assignment} onHide={() => setShowWord(false)} />
+          <WordReveal assignment={assignment} hint={wordHint} onHide={() => setShowWord(false)} />
         )}
 
         {/* Words revealed at end of round */}
@@ -1270,7 +1290,7 @@ function SoloTestPage({ onLeave }) {
                   <span style={{flex:1,fontWeight:500}}>{a.name}</span>
                   <span className={`badge ${a.role==="imposter"?"badge--red":"badge--green"}`}>{a.role}</span>
                   <span style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--muted)",minWidth:80,textAlign:"right"}}>
-                    {a.role==="imposter" && mode==="known" ? "no word" : (a.word || "—")}
+                    {a.role==="imposter" && mode==="known" ? "no word" : fmt(a.word || "—")}
                   </span>
                 </li>
               ))}
