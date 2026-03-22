@@ -256,8 +256,8 @@ app.post("/admin/generate", async (req, res) => {
       method:  "POST",
       headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",  // bypass ngrok browser warning page
-        "User-Agent": "ImposterGameServer/1.0",
+        "ngrok-skip-browser-warning": "69420",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
       body:    JSON.stringify({ model, prompt, stream: false }),
       signal:  AbortSignal.timeout(90_000),
@@ -307,7 +307,7 @@ function buildPrompt(modelChoice, { themeName, category, seedWords, referenceTex
 
   // Single pool prompt — all words go in one array, game picks two different ones each round
   return {
-    model: "qwen-90k",
+    model: "qwen-90k:latest",
     prompt: `You are generating a word pool for an Imposter Word Game.
 In this game, all players get a word from the same pool. Crewmates share one word, the imposter gets a DIFFERENT word from the same pool. So all words must be from the same theme but distinct enough that having a different word would be noticeable.
 
