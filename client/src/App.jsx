@@ -249,28 +249,37 @@ function LobbyPage({ game, onLeave }) {
       .catch(() => setThemeError(true));
   }, []);
 
+  const isMobile = typeof navigator.share === "function";
+
   function shareLink() {
     const url = `${window.location.origin}/room/${game.roomCode}`;
     const text = `Join my Imposter game! Code: ${game.roomCode}`;
-    if (navigator.share) {
-      // Mobile — native share sheet
+    if (isMobile) {
       navigator.share({ title: "Imposter", text, url }).catch(()=>{});
     } else {
-      // Desktop — copy link to clipboard
-      navigator.clipboard.writeText(url).then(() => {
+      // Desktop — always just copy to clipboard
+      try {
+        navigator.clipboard.writeText(url).then(() => {
+          setCopied("link");
+          setTimeout(() => setCopied(null), 2500);
+        }).catch(() => {
+          // Clipboard API blocked — use execCommand fallback
+          const el = document.createElement("textarea");
+          el.value = url;
+          el.style.position = "fixed";
+          el.style.opacity = "0";
+          document.body.appendChild(el);
+          el.focus();
+          el.select();
+          document.execCommand("copy");
+          document.body.removeChild(el);
+          setCopied("link");
+          setTimeout(() => setCopied(null), 2500);
+        });
+      } catch {
         setCopied("link");
-        setTimeout(() => setCopied(null), 2000);
-      }).catch(() => {
-        // Fallback if clipboard API unavailable
-        const el = document.createElement("textarea");
-        el.value = url;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand("copy");
-        document.body.removeChild(el);
-        setCopied("link");
-        setTimeout(() => setCopied(null), 2000);
-      });
+        setTimeout(() => setCopied(null), 2500);
+      }
     }
   }
 
@@ -302,7 +311,7 @@ function LobbyPage({ game, onLeave }) {
           <button className="btn btn--primary" onClick={shareLink} style={{width:"100%",letterSpacing:1}}>
             {copied === "link"
               ? "Link copied!"
-              : navigator.share ? "Share invite link" : "Copy invite link"}
+              : isMobile ? "Share invite link" : "Copy invite link"}
           </button>
           {/* Thin copy code row */}
           <button
