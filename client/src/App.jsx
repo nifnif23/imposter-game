@@ -1270,13 +1270,23 @@ function SoloTestPage({ onLeave }) {
             <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
               <div style={{padding:"8px 12px",background:"var(--bg)",border:"1px solid var(--green)",borderRadius:6,flex:1}}>
                 <div style={{fontFamily:"var(--mono)",fontSize:9,color:"var(--muted)",letterSpacing:1,marginBottom:4}}>CREWMATE WORD</div>
-                <div style={{fontFamily:"var(--display)",fontSize:20,color:"var(--green)",fontWeight:700}}>{result.mainWord}</div>
+                <div style={{fontFamily:"var(--display)",fontSize:20,color:"var(--green)",fontWeight:700}}>{fmt(result.mainWord)}</div>
+                {fullTheme?.hints?.[result.mainWord] && (
+                  <div style={{fontSize:11,color:"var(--muted)",fontStyle:"italic",marginTop:4,lineHeight:1.4}}>
+                    {fullTheme.hints[result.mainWord]}
+                  </div>
+                )}
               </div>
               <div style={{padding:"8px 12px",background:"var(--bg)",border:"1px solid var(--accent)",borderRadius:6,flex:1}}>
                 <div style={{fontFamily:"var(--mono)",fontSize:9,color:"var(--muted)",letterSpacing:1,marginBottom:4}}>IMPOSTER WORD</div>
                 <div style={{fontFamily:"var(--display)",fontSize:20,color:"var(--accent)",fontWeight:700}}>
-                  {mode==="known" ? "none (known mode)" : result.impWord}
+                  {mode==="known" ? "none (known mode)" : fmt(result.impWord)}
                 </div>
+                {mode!=="known" && fullTheme?.hints?.[result.impWord] && (
+                  <div style={{fontSize:11,color:"var(--muted)",fontStyle:"italic",marginTop:4,lineHeight:1.4}}>
+                    {fullTheme.hints[result.impWord]}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1284,14 +1294,22 @@ function SoloTestPage({ onLeave }) {
             <ul className="player-list">
               {result.assignments.map((a,i) => (
                 <li key={i} className="player-item" style={{
+                  flexDirection:"column", alignItems:"flex-start",
                   borderColor: a.role==="imposter" ? "rgba(230,57,80,.3)" : undefined
                 }}>
-                  <div className="live-dot" style={{background: a.role==="imposter" ? "var(--accent)" : "var(--green)"}}/>
-                  <span style={{flex:1,fontWeight:500}}>{a.name}</span>
-                  <span className={`badge ${a.role==="imposter"?"badge--red":"badge--green"}`}>{a.role}</span>
-                  <span style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--muted)",minWidth:80,textAlign:"right"}}>
-                    {a.role==="imposter" && mode==="known" ? "no word" : fmt(a.word || "—")}
-                  </span>
+                  <div style={{display:"flex",alignItems:"center",gap:9,width:"100%"}}>
+                    <div className="live-dot" style={{background: a.role==="imposter" ? "var(--accent)" : "var(--green)"}}/>
+                    <span style={{flex:1,fontWeight:500}}>{a.name}</span>
+                    <span className={`badge ${a.role==="imposter"?"badge--red":"badge--green"}`}>{a.role}</span>
+                    <span style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--muted)",minWidth:80,textAlign:"right"}}>
+                      {a.role==="imposter" && mode==="known" ? "no word" : fmt(a.word || "—")}
+                    </span>
+                  </div>
+                  {a.word && fullTheme?.hints?.[a.word] && (
+                    <div style={{fontSize:11,color:"var(--muted)",fontStyle:"italic",paddingLeft:16,marginTop:3,lineHeight:1.4}}>
+                      {fullTheme.hints[a.word]}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1300,8 +1318,8 @@ function SoloTestPage({ onLeave }) {
               <div style={{fontFamily:"var(--mono)",fontSize:9,color:"var(--muted)",letterSpacing:1,marginBottom:6}}>VERIFICATION</div>
               <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.8}}>
                 <div>Theme: <span style={{color:"var(--text)"}}>{result.theme}</span></div>
-                <div>Crewmates share: <span style={{color:"var(--green)"}}>{result.mainWord}</span></div>
-                <div>Imposter{imposterCount>1?"s":""} got: <span style={{color:"var(--accent)"}}>{mode==="known"?"no word":result.impWord}</span></div>
+                <div>Crewmates share: <span style={{color:"var(--green)"}}>{fmt(result.mainWord)}</span></div>
+                <div>Imposter{imposterCount>1?"s":""} got: <span style={{color:"var(--accent)"}}>{mode==="known"?"no word":fmt(result.impWord)}</span></div>
                 <div>Words are different: <span style={{color: result.mainWord!==result.impWord?"var(--green)":"var(--accent)"}}>{result.mainWord!==result.impWord?"yes — correct":"no — pool too small"}</span></div>
               </div>
             </div>
