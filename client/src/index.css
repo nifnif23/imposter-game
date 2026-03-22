@@ -28,6 +28,8 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
   /* Subtle scanline effect */
   background-image:
     repeating-linear-gradient(
@@ -101,8 +103,11 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh; /* dynamic viewport height — fixes mobile browser bars */
   padding: 20px 14px;
   animation: fadeUp .3s ease both;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 /* Card */
@@ -112,7 +117,8 @@ body {
   border-radius: 8px;
   padding: 20px 16px;
   width: 100%;
-  max-width: 420px;
+  max-width: min(420px, calc(100vw - 28px));
+  box-sizing: border-box;
 }
 .card--wide { max-width: 780px; }
 
@@ -177,6 +183,7 @@ label {
 
 input, select, textarea {
   width: 100%;
+  max-width: 100%;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -186,6 +193,7 @@ input, select, textarea {
   padding: 10px 13px;
   outline: none;
   transition: border-color .15s;
+  box-sizing: border-box;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--green); }
 input::placeholder { color: var(--dim); }
@@ -226,8 +234,8 @@ select option { background: var(--surface); }
 /* Room code */
 .room-code {
   font-family: var(--mono);
-  font-size: clamp(36px, 9vw, 52px);
-  letter-spacing: 10px;
+  font-size: clamp(24px, 8vw, 52px);
+  letter-spacing: clamp(4px, 2vw, 10px);
   color: var(--green);
   text-align: center;
   padding: 18px 8px;

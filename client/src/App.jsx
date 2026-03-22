@@ -434,6 +434,7 @@ function AdminPage({ onLeave }) {
   const [passcode,  setPasscode]  = useState("");
   const [authErr,   setAuthErr]   = useState("");
   const [shake,     setShake]     = useState(false);
+  const [showPass,  setShowPass]  = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [themes,    setThemes]    = useState([]);
   const [editing,   setEditing]   = useState(null);
@@ -546,10 +547,36 @@ function AdminPage({ onLeave }) {
           <label style={{color: authErr ? "var(--accent)" : undefined}}>
             {authErr ? authErr : "Passcode"}
           </label>
-          <input type="password" value={passcode} onChange={e=>{setPasscode(e.target.value);setAuthErr("");}}
-            onKeyDown={e=>e.key==="Enter"&&handleAuth()}
-            placeholder="••••••••" autoFocus
-            style={{borderColor: authErr ? "var(--accent)" : undefined}} />
+          <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+            <input
+              type={showPass ? "text" : "password"}
+              value={passcode}
+              onChange={e=>{setPasscode(e.target.value);setAuthErr("");}}
+              onKeyDown={e=>e.key==="Enter"&&handleAuth()}
+              placeholder="••••••••"
+              autoFocus
+              style={{
+                borderColor: authErr ? "var(--accent)" : undefined,
+                paddingRight: 44,
+                width: "100%",
+              }} />
+            <button
+              type="button"
+              onClick={()=>setShowPass(s=>!s)}
+              style={{
+                position:"absolute", right:0,
+                height:"100%", width:40,
+                background:"none", border:"none",
+                cursor:"pointer",
+                color: showPass ? "var(--text)" : "var(--muted)",
+                fontFamily:"var(--mono)", fontSize:9,
+                letterSpacing:0.5,
+                transition:"color .15s",
+                display:"flex", alignItems:"center", justifyContent:"center",
+              }}>
+              {showPass ? "HIDE" : "SHOW"}
+            </button>
+          </div>
         </div>
         <button className="btn btn--primary" disabled={loading} onClick={handleAuth}>
           {loading ? <><span className="spin"/>Checking…</> : "Unlock"}
@@ -563,7 +590,7 @@ function AdminPage({ onLeave }) {
   return (
     <div className="page" style={{justifyContent:"flex-start",paddingTop:50,alignItems:"stretch",maxWidth:860,margin:"0 auto"}}>
       <div className="admin-bar">
-        ADMIN MODE — {passcode}
+        ADMIN MODE
         <span style={{marginLeft:"auto",cursor:"pointer"}} onClick={onLeave}>Exit</span>
       </div>
 
@@ -578,11 +605,12 @@ function AdminPage({ onLeave }) {
               title="Toggle debug mode">
               {debugMode ? "DEBUG ON" : "DEBUG"}
             </button>
-          <button className="btn btn--green btn--sm" onClick={()=>{
-            setEditing({id:null});
-            setForm({name:"",category:"anime",seedWords:"",referenceText:"",words:[]});
-            setGenResult(null);
-          }}>+ New Theme</button>
+            <button className="btn btn--green btn--sm" onClick={()=>{
+              setEditing({id:null});
+              setForm({name:"",category:"anime",seedWords:"",referenceText:"",words:[]});
+              setGenResult(null);
+            }}>+ New Theme</button>
+          </div>
         </div>
 
         {error   && <div className="msg msg--error">{error}</div>}
@@ -609,8 +637,7 @@ function AdminPage({ onLeave }) {
               }}>Mock AI Result</button>
             </div>
             <div style={{marginTop:10,fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)"}}>
-              passcode: <span style={{color:"var(--text)"}}>{passcode || "(not set)"}</span>
-              {" · "}themes loaded: <span style={{color:"var(--text)"}}>{themes.length}</span>
+              themes loaded: <span style={{color:"var(--text)"}}>{themes.length}</span>
             </div>
           </div>
         )}
