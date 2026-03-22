@@ -94,7 +94,7 @@ function HomePage({ game, onEnter, onAdmin }) {
             </button>
             <div className="divider">or</div>
             <button className="nav-link" style={{display:"block",textAlign:"center",width:"100%"}} onClick={onAdmin}>
-              ⚙ Admin Panel
+              Admin Panel
             </button>
           </div>
         </>
@@ -112,7 +112,7 @@ function HomePage({ game, onEnter, onAdmin }) {
           <button className="btn btn--primary" disabled={game.loading || !name.trim()} onClick={handleCreate}>
             {game.loading ? <><span className="spin"/>Creating…</> : "Create Room"}
           </button>
-          <button className="btn btn--ghost" onClick={() => setMode("home")}>← Back</button>
+          <button className="btn btn--ghost" onClick={() => setMode("home")}>Back</button>
         </div>
       )}
 
@@ -135,7 +135,7 @@ function HomePage({ game, onEnter, onAdmin }) {
           <button className="btn btn--primary" disabled={game.loading || !name.trim() || code.length<6} onClick={handleJoin}>
             {game.loading ? <><span className="spin"/>Joining…</> : "Join Room"}
           </button>
-          <button className="btn btn--ghost" onClick={() => setMode("home")}>← Back</button>
+          <button className="btn btn--ghost" onClick={() => setMode("home")}>Back</button>
         </div>
       )}
     </div>
@@ -204,7 +204,7 @@ function LobbyPage({ game, onLeave }) {
             <li key={id} className="player-item">
               <div className="live-dot" />
               <span style={{flex:1}}>{p.name}</span>
-              {room?.hostId === id && <span style={{color:"#f5c842"}}>👑</span>}
+              {room?.hostId === id && <span className="badge badge--yellow">host</span>}
               {id === game.playerId && <span className="badge badge--green">you</span>}
             </li>
           ))}
@@ -235,8 +235,8 @@ function LobbyPage({ game, onLeave }) {
                 <div style={{display:"flex",flexDirection:"column",gap:5,width:"100%",maxHeight:170,overflowY:"auto"}}>
                   <div className={`theme-card ${!settings.themeId?"theme-card--active":""}`}
                     onClick={()=>setSettings(s=>({...s,themeId:null}))}>
-                    <span className="theme-card__name">🎲 No theme (random words)</span>
-                    {!settings.themeId && <span style={{color:"var(--green)"}}>✓</span>}
+                    <span className="theme-card__name">No theme (random words)</span>
+                    {!settings.themeId && <span className="badge badge--green">selected</span>}
                   </div>
                   {themes.map(t=>(
                     <div key={t.id}
@@ -246,7 +246,7 @@ function LobbyPage({ game, onLeave }) {
                         <div className="theme-card__name">{t.name}</div>
                         <div className="theme-card__meta">{t.category} · {t.word_count} words</div>
                       </div>
-                      {settings.themeId===t.id && <span style={{color:"var(--green)"}}>✓</span>}
+                      {settings.themeId===t.id && <span className="badge badge--green">selected</span>}
                     </div>
                   ))}
                 </div>
@@ -256,7 +256,7 @@ function LobbyPage({ game, onLeave }) {
             {error && <div className="msg msg--error">{error}</div>}
 
             <button className="btn btn--green" disabled={loading || players.length < 3} onClick={handleStart}>
-              {loading ? <><span className="spin"/>Starting…</> : `▶ Start Game`}
+              {loading ? <><span className="spin"/>Starting…</> : `Start Game`}
             </button>
             {players.length < 3 &&
               <p style={{fontSize:11,color:"var(--muted)",textAlign:"center",marginTop:6}}>Need at least 3 players to start</p>}
@@ -306,7 +306,7 @@ function GameScreen({ game, onLeave }) {
             </p>
             <button className="btn btn--yellow btn--inline" style={{width:"auto",padding:"12px 32px",marginTop:12}}
               onClick={()=>setShowWord(true)}>
-              👁 Reveal My Word
+              Reveal My Word
             </button>
           </div>
         ) : (
@@ -351,7 +351,7 @@ function GameScreen({ game, onLeave }) {
             <li key={id} className="player-item">
               <div className="live-dot" />
               <span style={{flex:1}}>{p.name}</span>
-              {room?.hostId === id && <span style={{color:"var(--yellow)"}}>👑</span>}
+              {room?.hostId === id && <span className="badge badge--yellow">host</span>}
               {id === game.playerId && <span className="badge badge--green">you</span>}
             </li>
           ))}
@@ -375,13 +375,13 @@ function GameScreen({ game, onLeave }) {
           <div style={{marginTop:16,paddingTop:16,borderTop:"1px solid var(--border)"}}>
             <h3>Host Controls</h3>
             <button className="btn btn--yellow" disabled={loading} onClick={game.revealWords}>
-              {loading ? <><span className="spin"/>…</> : "🔓 Reveal All Words"}
+              {loading ? <><span className="spin"/>…</> : "Reveal All Words"}
             </button>
           </div>
         )}
         {isHost && (
           <button className="btn btn--ghost" style={{marginTop:8}} disabled={loading} onClick={game.resetGame}>
-            {loading ? <><span className="spin"/>…</> : "↩ New Round"}
+            {loading ? <><span className="spin"/>…</> : "New Round"}
           </button>
         )}
 
@@ -407,7 +407,7 @@ function WordReveal({ assignment, onHide }) {
   return (
     <div className="reveal-wrap">
       <div className="reveal-role" style={{color: role==="crewmate" ? "var(--green)" : "var(--accent)"}}>
-        {isKnownImposter ? "⚠ you are the imposter" : role === "crewmate" ? "✓ crewmate" : "your word"}
+        {isKnownImposter ? "you are the imposter" : role === "crewmate" ? " crewmate" : "your word"}
       </div>
       <div className={`reveal-word ${role==="crewmate" ? "reveal-word--crew" : isKnownImposter ? "reveal-word--imp-know" : "reveal-word--imp-hide"}`}>
         {isKnownImposter ? "???" : word || "???"}
@@ -430,14 +430,16 @@ function WordReveal({ assignment, onHide }) {
 // PAGE: Admin
 // ═══════════════════════════════════════════════════════════════
 function AdminPage({ onLeave }) {
-  const [authed,   setAuthed]   = useState(false);
-  const [passcode, setPasscode] = useState("");
-  const [authErr,  setAuthErr]  = useState("");
-  const [themes,   setThemes]   = useState([]);
-  const [editing,  setEditing]  = useState(null);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState(null);
-  const [success,  setSuccess]  = useState(null);
+  const [authed,    setAuthed]    = useState(false);
+  const [passcode,  setPasscode]  = useState("");
+  const [authErr,   setAuthErr]   = useState("");
+  const [shake,     setShake]     = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [themes,    setThemes]    = useState([]);
+  const [editing,   setEditing]   = useState(null);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState(null);
+  const [success,   setSuccess]   = useState(null);
 
   const [form, setForm] = useState({
     name:"", category:"anime", seedWords:"", referenceText:"",
@@ -447,19 +449,24 @@ function AdminPage({ onLeave }) {
   const [generating, setGenerating] = useState(false);
 
   async function handleAuth() {
-    if (!passcode.trim()) return setAuthErr("Enter passcode");
+    if (!passcode.trim()) return triggerError("Enter a passcode");
     setLoading(true); setAuthErr("");
     try {
-      // Test the passcode server-side — wrong passcode returns 403 which throws
-      // Correct passcode returns 400 "Name required" which is fine — means auth passed
       await api.post("/admin/theme", { passcode, name: "", words: [] });
     } catch(e) {
       setLoading(false);
-      if (e.message.includes("Invalid passcode")) return setAuthErr("Wrong passcode");
+      if (e.message.includes("Invalid passcode")) return triggerError("Wrong passcode");
     }
     setLoading(false);
     setAuthed(true);
     loadThemes();
+  }
+
+  function triggerError(msg) {
+    setAuthErr(msg);
+    setShake(true);
+    setPasscode("");
+    setTimeout(() => setShake(false), 600);
   }
 
   async function loadThemes() {
@@ -522,21 +529,32 @@ function AdminPage({ onLeave }) {
 
   // ── Auth gate ──────────────────────────────────────────────
   if (!authed) return (
-    <div className="page">
-      <div className="card bracket">
+    <div className="page" style={{animation:"fadeUp .3s ease both"}}>
+      <div className="card bracket" style={{
+        animation: shake ? "shake .5s ease" : "none",
+        border: authErr ? "1px solid var(--accent)" : undefined,
+        transition: "border-color .2s",
+      }}>
         <div style={{textAlign:"center",marginBottom:24}}>
-          <div style={{fontSize:36,marginBottom:8}}>⚙</div>
-          <h2 style={{marginBottom:4}}>Admin Panel</h2>
+          <div style={{fontFamily:"var(--mono)",fontSize:11,color: authErr ? "var(--accent)" : "var(--muted)",letterSpacing:2,marginBottom:12}}>
+            {authErr ? "ACCESS DENIED" : "RESTRICTED"}
+          </div>
+          <h2 style={{marginBottom:4}}>Admin</h2>
           <p style={{color:"var(--muted)",fontSize:13}}>Theme management & AI generation</p>
         </div>
         <div className="field">
-          <label>Passcode</label>
-          <input type="password" value={passcode} onChange={e=>setPasscode(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&handleAuth()} placeholder="••••••••" autoFocus />
+          <label style={{color: authErr ? "var(--accent)" : undefined}}>
+            {authErr ? authErr : "Passcode"}
+          </label>
+          <input type="password" value={passcode} onChange={e=>{setPasscode(e.target.value);setAuthErr("");}}
+            onKeyDown={e=>e.key==="Enter"&&handleAuth()}
+            placeholder="••••••••" autoFocus
+            style={{borderColor: authErr ? "var(--accent)" : undefined}} />
         </div>
-        {authErr && <div className="msg msg--error">{authErr}</div>}
-        <button className="btn btn--primary" onClick={handleAuth}>Unlock</button>
-        <button className="btn btn--ghost" onClick={onLeave}>← Back to Game</button>
+        <button className="btn btn--primary" disabled={loading} onClick={handleAuth}>
+          {loading ? <><span className="spin"/>Checking…</> : "Unlock"}
+        </button>
+        <button className="btn btn--ghost" style={{marginTop:16}} onClick={onLeave}>Back to Game</button>
       </div>
     </div>
   );
@@ -545,13 +563,21 @@ function AdminPage({ onLeave }) {
   return (
     <div className="page" style={{justifyContent:"flex-start",paddingTop:50,alignItems:"stretch",maxWidth:860,margin:"0 auto"}}>
       <div className="admin-bar">
-        ⚠ ADMIN MODE — {passcode}
-        <span style={{marginLeft:"auto",cursor:"pointer"}} onClick={onLeave}>← Exit</span>
+        ADMIN MODE — {passcode}
+        <span style={{marginLeft:"auto",cursor:"pointer"}} onClick={onLeave}>Exit</span>
       </div>
 
       <div style={{padding:"0 16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"16px 0"}}>
           <h2 style={{marginBottom:0}}>Theme Manager</h2>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <button
+              className={`badge ${debugMode?"badge--yellow":""}`}
+              style={{cursor:"pointer",border:"none",padding:"5px 10px",fontSize:10}}
+              onClick={()=>setDebugMode(d=>!d)}
+              title="Toggle debug mode">
+              {debugMode ? "DEBUG ON" : "DEBUG"}
+            </button>
           <button className="btn btn--green btn--sm" onClick={()=>{
             setEditing({id:null});
             setForm({name:"",category:"anime",seedWords:"",referenceText:"",words:[]});
@@ -561,6 +587,33 @@ function AdminPage({ onLeave }) {
 
         {error   && <div className="msg msg--error">{error}</div>}
         {success && <div className="msg msg--success">{success}</div>}
+
+        {debugMode && (
+          <div style={{marginTop:8,padding:"12px 14px",background:"var(--bg)",border:"1px solid var(--yellow)",borderRadius:6,animation:"slideIn .2s ease"}}>
+            <div style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--yellow)",letterSpacing:1,marginBottom:10}}>DEBUG MODE</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              <button className="btn btn--ghost btn--sm" onClick={loadThemes}>Reload Themes</button>
+              <button className="btn btn--ghost btn--sm" onClick={()=>setEditing({id:null})}>+ Force New Theme</button>
+              <button className="btn btn--ghost btn--sm" onClick={()=>{
+                setSuccess("Test success message");
+                setTimeout(()=>setSuccess(null),2000);
+              }}>Test Success</button>
+              <button className="btn btn--danger btn--sm" onClick={()=>{
+                setError("Test error message");
+                setTimeout(()=>setError(null),2000);
+              }}>Test Error</button>
+              <button className="btn btn--ghost btn--sm" onClick={()=>{
+                const fake = {words:["test-word-1","test-word-2","test-word-3","test-word-4","test-word-5"],theme:"debug",model:"debug",cached:false};
+                setGenResult(fake);
+                setForm(f=>({...f,words:fake.words}));
+              }}>Mock AI Result</button>
+            </div>
+            <div style={{marginTop:10,fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)"}}>
+              passcode: <span style={{color:"var(--text)"}}>{passcode || "(not set)"}</span>
+              {" · "}themes loaded: <span style={{color:"var(--text)"}}>{themes.length}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{display:"flex",gap:16,padding:"0 16px 40px",flexWrap:"wrap",alignItems:"flex-start"}}>
@@ -579,7 +632,7 @@ function AdminPage({ onLeave }) {
                   </div>
                 </div>
                 <button className="btn btn--ghost btn--sm" onClick={()=>startEdit(t)}>Edit</button>
-                <button className="btn btn--danger btn--sm" onClick={()=>handleDelete(t.id)}>✕</button>
+                <button className="btn btn--danger btn--sm" onClick={()=>handleDelete(t.id)}>x</button>
               </div>
             ))}
           </div>
@@ -616,12 +669,12 @@ function AdminPage({ onLeave }) {
 
 
               <button className="btn btn--yellow" disabled={generating||!form.name} onClick={handleGenerate}>
-                {generating ? <><span className="spin"/>Generating…</> : "✨ Generate with AI"}
+                {generating ? <><span className="spin"/>Generating…</> : "Generate with AI"}
               </button>
 
               {genResult && (
                 <div className="msg msg--success" style={{marginTop:8}}>
-                  ✓ {genResult.words?.length} words in pool
+                   {genResult.words?.length} words in pool
                   {genResult.cached ? " (cached)" : ` via ${genResult.model}`}
                 </div>
               )}
@@ -640,7 +693,7 @@ function AdminPage({ onLeave }) {
               <div style={{display:"flex",gap:8,marginTop:14}}>
                 <button className="btn btn--primary" style={{flex:1}}
                   disabled={loading||!form.name||form.words.length===0} onClick={handleSave}>
-                  {loading ? <><span className="spin"/>Saving…</> : "💾 Save Theme"}
+                  {loading ? <><span className="spin"/>Saving…</> : "Save Theme"}
                 </button>
                 <button className="btn btn--ghost btn--sm" onClick={()=>setEditing(null)}>Cancel</button>
               </div>
@@ -717,7 +770,7 @@ JSON only:`;
   return (
     <div style={{marginTop:12}}>
       <button className="nav-link" onClick={()=>setShow(s=>!s)}>
-        {show?"▼":"▶"} Preview AI prompts
+        {show?"-":"+"} Preview AI prompts
       </button>
       {show && (
         <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:10}}>
@@ -726,7 +779,7 @@ JSON only:`;
               <div style={{padding:"6px 10px",background:"var(--bg)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--green)",letterSpacing:1}}>{label}</span>
                 <button className="btn btn--ghost btn--sm" onClick={()=>copy(prompt,key)}>
-                  {copied===key?"✓ Copied":"Copy"}
+                  {copied===key?" Copied":"Copy"}
                 </button>
               </div>
               <pre className="prompt-box">{prompt}</pre>
