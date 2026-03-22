@@ -12,28 +12,39 @@ export function useGame() {
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState(null);
 
-  // Restore session from localStorage on mount
+  // Restore session from localStorage — attempt rejoin once socket is connected
   useEffect(() => {
-    const saved = localStorage.getItem("imposter_session");
-    if (saved) {
+    function tryRejoin() {
+      const saved = localStorage.getItem("imposter_session");
+      if (!saved) return;
       try {
         const { roomCode, playerId, playerName } = JSON.parse(saved);
-        if (roomCode && playerId) {
-          socket.emit("rejoin_room", { roomCode, playerId, playerName }, (res) => {
-            if (!res.error) {
-              setRoomCode(roomCode);
-              setPlayerId(playerId);
-            } else {
-              localStorage.removeItem("imposter_session");
-            }
-          });
-        }
-      } catch {}
+        if (!roomCode || !playerId) return;
+        socket.emit("rejoin_room", { roomCode, playerId, playerName }, (res) => {
+          if (!res?.error) {
+            setRoomCode(roomCode);
+            setPlayerId(playerId);
+          } else {
+            // Room expired — clear session
+            localStorage.removeItem("imposter_session");
+          }
+        });
+      } catch {
+        localStorage.removeItem("imposter_session");
+      }
     }
+
+    // If already connected, rejoin immediately
+    if (socket.connected) {
+      tryRejoin();
+    }
+    // Also rejoin on every (re)connect — handles reload + reconnect cases
+    socket.on("connect", tryRejoin);
+    return () => socket.off("connect", tryRejoin);
   }, []);
 
   useEffect(() => {
-    const onConnect    = () => setConnected(true);
+    const onConnect    = () => { setConnected(true); };
     const onDisconnect = () => setConnected(false);
     const onRoomUpdate = (data) => setRoom(data);
     const onAssignment = (data) => setAssignment(data);

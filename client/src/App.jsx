@@ -21,29 +21,34 @@ const api = {
 };
 
 // ── Root App ──────────────────────────────────────────────────
+// Single game instance shared across all routes via React context
+import { createContext, useContext } from "react";
+const GameCtx = createContext(null);
+const useGameCtx = () => useContext(GameCtx);
+
 export default function App() {
+  const game = useGame(); // ONE instance for the whole app
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/"           element={<HomeRoute />} />
-        <Route path="/room/:code" element={<RoomRoute />} />
-        <Route path="/admin"      element={<AdminPage onLeave={()=>window.location.href="/"} />} />
-        <Route path="/test"       element={<SoloTestPage onLeave={()=>window.location.href="/"} />} />
-        <Route path="*"           element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <GameCtx.Provider value={game}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/"           element={<HomeRoute />} />
+          <Route path="/room/:code" element={<RoomRoute />} />
+          <Route path="/admin"      element={<AdminPage onLeave={()=>window.location.href="/"} />} />
+          <Route path="/test"       element={<SoloTestPage onLeave={()=>window.location.href="/"} />} />
+          <Route path="*"           element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </GameCtx.Provider>
   );
 }
 
 // Home route wrapper
 function HomeRoute() {
   const nav = useNavigate();
-  const game = useGame();
-
-  // Read ?join=CODE from URL (set by RoomRoute when someone shares a link)
+  const game = useGameCtx();
   const joinCode = new URLSearchParams(window.location.search).get("join") || "";
 
-  // If we have a room in session, redirect back to it
   useEffect(() => {
     if (game.roomCode) nav(`/room/${game.roomCode}`, { replace: true });
   }, [game.roomCode]);
@@ -61,42 +66,44 @@ function HomeRoute() {
 function RoomRoute() {
   const { code } = useParams();
   const nav = useNavigate();
-  const game = useGame();
-  const [checking, setChecking] = useState(true);
+  const game = useGameCtx();
+  const upperCode = code.toUpperCase();
 
+  // On mount: validate session, redirect if needed
   useEffect(() => {
     const saved = localStorage.getItem("imposter_session");
     if (!saved) {
-      // No session — check if this is a join link someone shared
-      // Send them to home with the code pre-filled
-      nav(`/?join=${code.toUpperCase()}`, { replace: true });
+      // No session — must be someone clicking a share link
+      nav(`/?join=${upperCode}`, { replace: true });
       return;
     }
     try {
       const session = JSON.parse(saved);
-      if (session.roomCode !== code.toUpperCase()) {
-        // Different room — clear old session and redirect home with new code
+      if (session.roomCode !== upperCode) {
+        // Session is for a different room — redirect with new code pre-filled
         localStorage.removeItem("imposter_session");
-        nav(`/?join=${code.toUpperCase()}`, { replace: true });
-        return;
+        nav(`/?join=${upperCode}`, { replace: true });
       }
+      // Session matches — useGame will handle the socket rejoin automatically
     } catch {
       localStorage.removeItem("imposter_session");
       nav("/", { replace: true });
-      return;
     }
-    setChecking(false);
   }, []);
 
-  if (checking) return (
+  function goHome() { game.leaveRoom(); nav("/"); }
+
+  // Show loading until we have room data from socket
+  if (!game.room) return (
     <div className="page">
-      <div style={{fontFamily:"var(--mono)",fontSize:12,color:"var(--muted)",letterSpacing:2}}>
-        <span className="spin" style={{marginRight:8}}/>connecting…
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+        <div style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--muted)",letterSpacing:2,display:"flex",alignItems:"center",gap:8}}>
+          <span className="spin"/>connecting to room {upperCode}…
+        </div>
+        <button className="nav-link" onClick={goHome}>Leave</button>
       </div>
     </div>
   );
-
-  function goHome() { game.leaveRoom(); nav("/"); }
 
   if (game.room?.gameState?.started) {
     return <GameScreen game={game} onLeave={goHome} />;
@@ -232,7 +239,7 @@ function GameArea({ game, onLeave }) {
 function LobbyPage({ game, onLeave }) {
   const [themes,   setThemes]   = useState([]);
   const [settings, setSettings] = useState({ imposters:1, mode:"hidden", themeId:null });
-  const [copied,   setCopied]   = useState(false); // false | "link" | "code" 
+  const [copied,   setCopied]   = useState(null); // false | "link" | "code" 
 
   useEffect(() => {
     api.get("/themes").then(t => setThemes(Array.isArray(t) ? t : [])).catch(()=>{});
