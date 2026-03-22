@@ -106,7 +106,7 @@ app.get("/health", (_, res) => res.json({ ok: true }));
 app.get("/themes", async (_, res) => {
   const { data, error } = await supabase
     .from("themes")
-    .select("id, name, category, word_count, imposter_count")
+    .select("id, name, category, word_count")
     .order("category");
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
