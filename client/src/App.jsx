@@ -40,6 +40,9 @@ function HomeRoute() {
   const nav = useNavigate();
   const game = useGame();
 
+  // Read ?join=CODE from URL (set by RoomRoute when someone shares a link)
+  const joinCode = new URLSearchParams(window.location.search).get("join") || "";
+
   // If we have a room in session, redirect back to it
   useEffect(() => {
     if (game.roomCode) nav(`/room/${game.roomCode}`, { replace: true });
@@ -47,6 +50,7 @@ function HomeRoute() {
 
   return <HomePage
     game={game}
+    initialCode={joinCode}
     onEnter={(code) => nav(`/room/${code}`)}
     onAdmin={() => nav("/admin")}
     onSoloTest={() => nav("/test")}
@@ -58,22 +62,39 @@ function RoomRoute() {
   const { code } = useParams();
   const nav = useNavigate();
   const game = useGame();
+  const [checking, setChecking] = useState(true);
 
-  // On mount, if we have no room but have a code in URL, try to rejoin from localStorage
   useEffect(() => {
-    if (!game.roomCode && code) {
-      const saved = localStorage.getItem("imposter_session");
-      if (!saved) { nav("/", { replace: true }); return; }
-      try {
-        const { roomCode, playerId, playerName } = JSON.parse(saved);
-        if (roomCode !== code.toUpperCase()) { nav("/", { replace: true }); }
-      } catch { nav("/", { replace: true }); }
+    const saved = localStorage.getItem("imposter_session");
+    if (!saved) {
+      // No session — check if this is a join link someone shared
+      // Send them to home with the code pre-filled
+      nav(`/?join=${code.toUpperCase()}`, { replace: true });
+      return;
     }
+    try {
+      const session = JSON.parse(saved);
+      if (session.roomCode !== code.toUpperCase()) {
+        // Different room — clear old session and redirect home with new code
+        localStorage.removeItem("imposter_session");
+        nav(`/?join=${code.toUpperCase()}`, { replace: true });
+        return;
+      }
+    } catch {
+      localStorage.removeItem("imposter_session");
+      nav("/", { replace: true });
+      return;
+    }
+    setChecking(false);
   }, []);
 
-  if (!game.roomCode && !localStorage.getItem("imposter_session")) {
-    return <Navigate to="/" replace />;
-  }
+  if (checking) return (
+    <div className="page">
+      <div style={{fontFamily:"var(--mono)",fontSize:12,color:"var(--muted)",letterSpacing:2}}>
+        <span className="spin" style={{marginRight:8}}/>connecting…
+      </div>
+    </div>
+  );
 
   function goHome() { game.leaveRoom(); nav("/"); }
 
@@ -97,10 +118,10 @@ function ConnBadge({ connected }) {
 // ═══════════════════════════════════════════════════════════════
 // PAGE: Home
 // ═══════════════════════════════════════════════════════════════
-function HomePage({ game, onEnter, onAdmin, onSoloTest }) {
-  const [mode, setMode]   = useState("home"); // home | create | join
+function HomePage({ game, onEnter, onAdmin, onSoloTest, initialCode="" }) {
+  const [mode, setMode]   = useState(initialCode ? "join" : "home");
   const [name, setName]   = useState("");
-  const [code, setCode]   = useState("");
+  const [code, setCode]   = useState(initialCode.toUpperCase());
 
   async function handleCreate() {
     if (!name.trim()) return;
@@ -211,7 +232,7 @@ function GameArea({ game, onLeave }) {
 function LobbyPage({ game, onLeave }) {
   const [themes,   setThemes]   = useState([]);
   const [settings, setSettings] = useState({ imposters:1, mode:"hidden", themeId:null });
-  const [copied,   setCopied]   = useState(false);
+  const [copied,   setCopied]   = useState(false); // false | "link" | "code" 
 
   useEffect(() => {
     api.get("/themes").then(t => setThemes(Array.isArray(t) ? t : [])).catch(()=>{});
@@ -224,7 +245,7 @@ function LobbyPage({ game, onLeave }) {
       navigator.share({ title: "Imposter", text, url }).catch(()=>{});
     } else {
       navigator.clipboard.writeText(url).catch(()=>{});
-      setCopied(true);
+      setCopied("link");
       setTimeout(() => setCopied(false), 2000);
     }
   }
@@ -249,18 +270,18 @@ function LobbyPage({ game, onLeave }) {
         </div>
 
         {/* Room code + share */}
-        <div className="room-code bracket" onClick={share} title="Tap to share">
+        <div className="room-code bracket" onClick={share} title="Tap to share or copy">
           {roomCode}
         </div>
         <div style={{display:"flex",gap:8,marginTop:6,marginBottom:16}}>
-          <button className="btn btn--ghost btn--sm" style={{flex:1}} onClick={share}>
-            {copied ? "Link copied!" : "Copy invite link"}
+          <button className="btn btn--ghost btn--sm" style={{flex:1,fontSize:11}} onClick={share}>
+            {copied === "link" ? "Copied!" : "Share link"}
           </button>
-          <button className="btn btn--ghost btn--sm" style={{flex:1}} onClick={()=>{
+          <button className="btn btn--ghost btn--sm" style={{flex:1,fontSize:11}} onClick={()=>{
             navigator.clipboard.writeText(game.roomCode).catch(()=>{});
-            setCopied(true); setTimeout(()=>setCopied(false),2000);
+            setCopied("code"); setTimeout(()=>setCopied(false),2000);
           }}>
-            {copied ? "Copied!" : "Copy code only"}
+            {copied === "code" ? "Copied!" : "Copy code"}
           </button>
         </div>
 
@@ -915,7 +936,24 @@ function SoloTestPage({ onLeave }) {
     const theme = themes.find(t => t.id === themeId);
     const pool = theme?.words?.length
       ? theme.words
-      : ["apple","banana","cherry","dragon","eagle","falcon","grape","harbor","island","jungle"];
+      : ["kettle","mirror","pillow","blanket","curtain","ladder","bucket","candle","drawer","fridge",
+        "toaster","scissors","hammer","stapler","envelope","calendar","remote","charger","umbrella","suitcase",
+        "doorbell","mailbox","bathtub","carpet","chimney","cupboard","wardrobe","pizza","burger","sushi",
+        "ramen","pasta","curry","steak","salmon","mango","avocado","croissant","waffle","pancake",
+        "brownie","pretzel","noodles","burrito","taco","dumpling","cheesecake","espresso","smoothie","lemonade",
+        "milkshake","cocktail","whiskey","cider","yoghurt","granola","omelette","penguin","dolphin","elephant",
+        "giraffe","cheetah","gorilla","panther","flamingo","octopus","hedgehog","mongoose","raccoon","platypus",
+        "chameleon","pelican","vulture","meerkat","capybara","axolotl","hamster","parrot","iguana","tortoise",
+        "piranha","narwhal","walrus","manatee","wolverine","armadillo","library","airport","stadium","hospital",
+        "cathedral","lighthouse","cemetery","volcano","glacier","canyon","swamp","harbour","plateau","peninsula",
+        "suburb","alleyway","rooftop","basement","greenhouse","warehouse","observatory","aquarium","monastery",
+        "submarine","helicopter","motorcycle","skateboard","hovercraft","gondola","zeppelin","tractor","ambulance",
+        "telescope","microscope","calculator","projector","satellite","compass","thermometer","hourglass","periscope",
+        "tuxedo","kimono","sombrero","beret","gloves","scarf","boots","sandals","goggles","bracelet",
+        "lightning","avalanche","monsoon","tornado","blizzard","earthquake","tsunami","rainbow","eclipse",
+        "waterfall","geyser","quicksand","cactus","bamboo","mushroom","archery","fencing","surfing","wrestling",
+        "lacrosse","cricket","badminton","blacksmith","surgeon","astronaut","detective","archaeologist","locksmith",
+        "anchor","trophy","passport","blueprint","fossil","crystal","magnet","prism","vault","labyrinth"];
 
     const mainWord = pool[Math.floor(Math.random() * pool.length)];
     const remaining = pool.filter(w => w !== mainWord);
