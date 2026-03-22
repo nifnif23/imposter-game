@@ -20,7 +20,7 @@ const ADMIN_PASS    = process.env.ADMIN_PASSCODE || "changeme";
 const AI_BASE_URL   = process.env.AI_BASE_URL    || "http://localhost:11434";
 // Support multiple origins separated by commas e.g. "https://a.vercel.app,https://b.vercel.app"
 const CLIENT_ORIGINS = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
-  .split(",").map(o => o.trim().replace(//+$/, ""));
+  .split(",").map(o => o.trim().replace(/\/+$/, ""));
 
 // ── Supabase (server-side, uses service key — never expose to client) ──
 const supabase = createClient(
