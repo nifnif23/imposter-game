@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate } from "react-router-dom";
 import { useGame } from "./useGame.js";
 
 // ── API helper (REST calls to our server) ─────────────────────
@@ -21,19 +22,65 @@ const api = {
 
 // ── Root App ──────────────────────────────────────────────────
 export default function App() {
-  const [page, setPage] = useState("home"); // home | game | admin
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/"           element={<HomeRoute />} />
+        <Route path="/room/:code" element={<RoomRoute />} />
+        <Route path="/admin"      element={<AdminPage onLeave={()=>window.location.href="/"} />} />
+        <Route path="/test"       element={<SoloTestPage onLeave={()=>window.location.href="/"} />} />
+        <Route path="*"           element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+// Home route wrapper
+function HomeRoute() {
+  const nav = useNavigate();
   const game = useGame();
 
-  // Auto-enter game page if we have a room (e.g. after reconnect)
+  // If we have a room in session, redirect back to it
   useEffect(() => {
-    if (game.roomCode && page === "home") setPage("game");
+    if (game.roomCode) nav(`/room/${game.roomCode}`, { replace: true });
   }, [game.roomCode]);
 
-  function goHome() { game.leaveRoom(); setPage("home"); }
+  return <HomePage
+    game={game}
+    onEnter={(code) => nav(`/room/${code}`)}
+    onAdmin={() => nav("/admin")}
+    onSoloTest={() => nav("/test")}
+  />;
+}
 
-  if (page === "admin") return <AdminPage onLeave={() => setPage("home")} />;
-  if (page === "game")  return <GameArea  game={game} onLeave={goHome} />;
-  return <HomePage game={game} onEnter={() => setPage("game")} onAdmin={() => setPage("admin")} />;
+// Room route wrapper — handles refresh via roomCode in URL
+function RoomRoute() {
+  const { code } = useParams();
+  const nav = useNavigate();
+  const game = useGame();
+
+  // On mount, if we have no room but have a code in URL, try to rejoin from localStorage
+  useEffect(() => {
+    if (!game.roomCode && code) {
+      const saved = localStorage.getItem("imposter_session");
+      if (!saved) { nav("/", { replace: true }); return; }
+      try {
+        const { roomCode, playerId, playerName } = JSON.parse(saved);
+        if (roomCode !== code.toUpperCase()) { nav("/", { replace: true }); }
+      } catch { nav("/", { replace: true }); }
+    }
+  }, []);
+
+  if (!game.roomCode && !localStorage.getItem("imposter_session")) {
+    return <Navigate to="/" replace />;
+  }
+
+  function goHome() { game.leaveRoom(); nav("/"); }
+
+  if (game.room?.gameState?.started) {
+    return <GameScreen game={game} onLeave={goHome} />;
+  }
+  return <LobbyPage game={game} onLeave={goHome} />;
 }
 
 // ── Connection badge ──────────────────────────────────────────
@@ -50,18 +97,24 @@ function ConnBadge({ connected }) {
 // ═══════════════════════════════════════════════════════════════
 // PAGE: Home
 // ═══════════════════════════════════════════════════════════════
-function HomePage({ game, onEnter, onAdmin }) {
+function HomePage({ game, onEnter, onAdmin, onSoloTest }) {
   const [mode, setMode]   = useState("home"); // home | create | join
   const [name, setName]   = useState("");
   const [code, setCode]   = useState("");
 
   async function handleCreate() {
     if (!name.trim()) return;
-    try { await game.createRoom(name); onEnter(); } catch {}
+    try {
+      const res = await game.createRoom(name);
+      onEnter(res.roomCode);
+    } catch {}
   }
   async function handleJoin() {
     if (!name.trim() || code.length < 6) return;
-    try { await game.joinRoom(code, name); onEnter(); } catch {}
+    try {
+      const res = await game.joinRoom(code, name);
+      onEnter(res.roomCode);
+    } catch {}
   }
 
   return (
@@ -164,9 +217,16 @@ function LobbyPage({ game, onLeave }) {
     api.get("/themes").then(t => setThemes(Array.isArray(t) ? t : [])).catch(()=>{});
   }, []);
 
-  function copy() {
-    navigator.clipboard.writeText(game.roomCode).catch(()=>{});
-    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  function share() {
+    const url = `${window.location.origin}/room/${game.roomCode}`;
+    const text = `Join my Imposter game! Code: ${game.roomCode}`;
+    if (navigator.share) {
+      navigator.share({ title: "Imposter", text, url }).catch(()=>{});
+    } else {
+      navigator.clipboard.writeText(url).catch(()=>{});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   }
 
   async function handleStart() {
@@ -188,14 +248,21 @@ function LobbyPage({ game, onLeave }) {
           <span className="badge badge--green">{players.length} online</span>
         </div>
 
-        {/* Room code */}
-        <div className="room-code bracket" onClick={copy} title="Tap to copy">
+        {/* Room code + share */}
+        <div className="room-code bracket" onClick={share} title="Tap to share">
           {roomCode}
         </div>
-        {copied
-          ? <div className="msg msg--success" style={{textAlign:"center",marginTop:-4,marginBottom:8}}>Copied!</div>
-          : <p style={{fontSize:12,color:"var(--muted)",textAlign:"center",marginBottom:16}}>Share this code with friends to join</p>
-        }
+        <div style={{display:"flex",gap:8,marginTop:6,marginBottom:16}}>
+          <button className="btn btn--ghost btn--sm" style={{flex:1}} onClick={share}>
+            {copied ? "Link copied!" : "Copy invite link"}
+          </button>
+          <button className="btn btn--ghost btn--sm" style={{flex:1}} onClick={()=>{
+            navigator.clipboard.writeText(game.roomCode).catch(()=>{});
+            setCopied(true); setTimeout(()=>setCopied(false),2000);
+          }}>
+            {copied ? "Copied!" : "Copy code only"}
+          </button>
+        </div>
 
         {/* Players */}
         <h3>Players</h3>
@@ -291,9 +358,14 @@ function GameScreen({ game, onLeave }) {
         {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
           <h2 style={{marginBottom:0}}>In Game</h2>
-          <div style={{display:"flex",gap:5}}>
+          <div style={{display:"flex",gap:5,alignItems:"center"}}>
             <span className="badge">{roomCode}</span>
             <span className="badge">{modeLabel}</span>
+            <button className="btn btn--ghost btn--sm" style={{padding:"4px 10px"}} onClick={()=>{
+              const url = `${window.location.origin}/room/${roomCode}`;
+              if (navigator.share) navigator.share({title:"Imposter",text:`Join code: ${roomCode}`,url}).catch(()=>{});
+              else navigator.clipboard.writeText(url).catch(()=>{});
+            }}>share</button>
           </div>
         </div>
 
@@ -814,6 +886,159 @@ JSON only:`;
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE: SoloTestPage — debug simulator for testing game logic
+// Access: click the IMPOSTER logo 5 times fast on home screen
+// ═══════════════════════════════════════════════════════════════
+function SoloTestPage({ onLeave }) {
+  const SERVER = import.meta.env.VITE_SERVER_URL || "";
+
+  const [playerCount, setPlayerCount] = useState(4);
+  const [imposterCount, setImposterCount] = useState(1);
+  const [mode, setMode] = useState("hidden");
+  const [themeId, setThemeId] = useState(null);
+  const [themes, setThemes] = useState([]);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`${SERVER}/themes`).then(r=>r.json()).then(t=>setThemes(Array.isArray(t)?t:[])).catch(()=>{});
+  }, []);
+
+  // Simulate role assignment locally (mirrors server logic exactly)
+  function simulate() {
+    setLoading(true);
+    const theme = themes.find(t => t.id === themeId);
+    const pool = theme?.words?.length
+      ? theme.words
+      : ["apple","banana","cherry","dragon","eagle","falcon","grape","harbor","island","jungle"];
+
+    const mainWord = pool[Math.floor(Math.random() * pool.length)];
+    const remaining = pool.filter(w => w !== mainWord);
+    const impWord = remaining.length
+      ? remaining[Math.floor(Math.random() * remaining.length)]
+      : mainWord;
+
+    const names = ["Alice","Bob","Carol","Dave","Eve","Frank","Grace","Hal"];
+    const players = Array.from({length: playerCount}, (_, i) => ({
+      id: `player_${i}`, name: names[i] || `Player ${i+1}`
+    }));
+
+    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    const imposterSet = new Set(shuffled.slice(0, imposterCount).map(p => p.id));
+
+    const assignments = players.map(p => {
+      const isImp = imposterSet.has(p.id);
+      return {
+        name: p.name,
+        role: isImp ? "imposter" : "crewmate",
+        word: isImp
+          ? (mode === "hidden" ? impWord : null)
+          : mainWord,
+        knowsRole: isImp ? mode === "known" : true,
+      };
+    });
+
+    setTimeout(() => {
+      setResult({ assignments, mainWord, impWord, pool: pool.slice(0, 10), theme: theme?.name || "default" });
+      setLoading(false);
+    }, 400);
+  }
+
+  return (
+    <div className="page" style={{justifyContent:"flex-start", paddingTop:24}}>
+      <div className="card" style={{maxWidth:520}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h2 style={{marginBottom:0}}>Solo Test</h2>
+          <span className="badge badge--yellow">DEBUG</span>
+        </div>
+
+        {/* Config */}
+        <div className="settings-row">
+          <label>Players</label>
+          <select value={playerCount} style={{maxWidth:100}} onChange={e=>setPlayerCount(Number(e.target.value))}>
+            {[3,4,5,6,7,8].map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="settings-row">
+          <label>Imposters</label>
+          <select value={imposterCount} style={{maxWidth:100}} onChange={e=>setImposterCount(Number(e.target.value))}>
+            {[1,2,3].map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="settings-row">
+          <label>Mode</label>
+          <select value={mode} style={{maxWidth:180}} onChange={e=>setMode(e.target.value)}>
+            <option value="hidden">Hidden imposter</option>
+            <option value="known">Known imposter</option>
+          </select>
+        </div>
+        <div className="settings-row" style={{flexDirection:"column",alignItems:"flex-start",gap:6}}>
+          <label>Theme</label>
+          <select value={themeId||""} style={{width:"100%"}} onChange={e=>setThemeId(e.target.value||null)}>
+            <option value="">Default words (no theme)</option>
+            {themes.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+
+        <button className="btn btn--yellow" disabled={loading} style={{marginTop:16}} onClick={simulate}>
+          {loading ? <><span className="spin"/>Simulating…</> : "Run Simulation"}
+        </button>
+
+        {/* Results */}
+        {result && (
+          <div style={{marginTop:20,animation:"fadeUp .25s ease"}}>
+            <div className="divider">Round Result</div>
+
+            <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+              <div style={{padding:"8px 12px",background:"var(--bg)",border:"1px solid var(--green)",borderRadius:6,flex:1}}>
+                <div style={{fontFamily:"var(--mono)",fontSize:9,color:"var(--muted)",letterSpacing:1,marginBottom:4}}>CREWMATE WORD</div>
+                <div style={{fontFamily:"var(--display)",fontSize:20,color:"var(--green)",fontWeight:700}}>{result.mainWord}</div>
+              </div>
+              <div style={{padding:"8px 12px",background:"var(--bg)",border:"1px solid var(--accent)",borderRadius:6,flex:1}}>
+                <div style={{fontFamily:"var(--mono)",fontSize:9,color:"var(--muted)",letterSpacing:1,marginBottom:4}}>IMPOSTER WORD</div>
+                <div style={{fontFamily:"var(--display)",fontSize:20,color:"var(--accent)",fontWeight:700}}>
+                  {mode==="known" ? "none (known mode)" : result.impWord}
+                </div>
+              </div>
+            </div>
+
+            <h3 style={{marginBottom:8}}>Player Assignments</h3>
+            <ul className="player-list">
+              {result.assignments.map((a,i) => (
+                <li key={i} className="player-item" style={{
+                  borderColor: a.role==="imposter" ? "rgba(230,57,80,.3)" : undefined
+                }}>
+                  <div className="live-dot" style={{background: a.role==="imposter" ? "var(--accent)" : "var(--green)"}}/>
+                  <span style={{flex:1,fontWeight:500}}>{a.name}</span>
+                  <span className={`badge ${a.role==="imposter"?"badge--red":"badge--green"}`}>{a.role}</span>
+                  <span style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--muted)",minWidth:80,textAlign:"right"}}>
+                    {a.role==="imposter" && mode==="known" ? "no word" : (a.word || "—")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div style={{marginTop:12,padding:"10px 12px",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6}}>
+              <div style={{fontFamily:"var(--mono)",fontSize:9,color:"var(--muted)",letterSpacing:1,marginBottom:6}}>VERIFICATION</div>
+              <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.8}}>
+                <div>Theme: <span style={{color:"var(--text)"}}>{result.theme}</span></div>
+                <div>Crewmates share: <span style={{color:"var(--green)"}}>{result.mainWord}</span></div>
+                <div>Imposter{imposterCount>1?"s":""} got: <span style={{color:"var(--accent)"}}>{mode==="known"?"no word":result.impWord}</span></div>
+                <div>Words are different: <span style={{color: result.mainWord!==result.impWord?"var(--green)":"var(--accent)"}}>{result.mainWord!==result.impWord?"yes — correct":"no — pool too small"}</span></div>
+              </div>
+            </div>
+
+            <button className="btn btn--ghost" style={{marginTop:10}} onClick={simulate}>Run Again</button>
+          </div>
+        )}
+
+        <button className="btn btn--ghost" style={{marginTop:12}} onClick={onLeave}>Back to Game</button>
+      </div>
     </div>
   );
 }
