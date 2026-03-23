@@ -637,7 +637,7 @@ function GameScreen({ game, onLeave }) {
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT: WordReveal
 // ═══════════════════════════════════════════════════════════════
-function WordReveal({ assignment, onHide }) {
+function WordReveal({ assignment, hint, onHide }) {
   if (!assignment) return (
     <div className="reveal-wrap">
       <p style={{color:"var(--muted)"}}>Waiting for assignment…</p>
@@ -650,19 +650,36 @@ function WordReveal({ assignment, onHide }) {
   return (
     <div className="reveal-wrap">
       <div className="reveal-role" style={{color: role==="crewmate" ? "var(--green)" : "var(--accent)"}}>
-        {isKnownImposter ? "you are the imposter" : role === "crewmate" ? " crewmate" : "your word"}
+        {isKnownImposter ? "you are the imposter" : role === "crewmate" ? "crewmate" : "your word"}
       </div>
       <div className={`reveal-word ${role==="crewmate" ? "reveal-word--crew" : isKnownImposter ? "reveal-word--imp-know" : "reveal-word--imp-hide"}`}>
-        {isKnownImposter ? "???" : word || "???"}
+        {isKnownImposter ? "???" : fmt(word) || "???"}
       </div>
-      <div className="reveal-hint">
+      {/* Hint — shown to crewmates and hidden imposters so they can give good clues */}
+      {!isKnownImposter && hint && (
+        <div style={{
+          margin:"10px 0 4px",
+          padding:"9px 13px",
+          background:"rgba(255,255,255,.04)",
+          border:"1px solid var(--border)",
+          borderRadius:6,
+          fontSize:12,
+          color:"var(--muted)",
+          fontStyle:"italic",
+          lineHeight:1.6,
+          textAlign:"left",
+        }}>
+          {hint}
+        </div>
+      )}
+      <div className="reveal-hint" style={{marginTop: hint ? 6 : undefined}}>
         {isKnownImposter
           ? "You have no word. Listen carefully and bluff using others' clues."
           : role === "crewmate"
             ? "Give clues about your word — but don't say it directly!"
             : "Give clues about your word. You might not know you're the imposter."}
       </div>
-      <button className="btn btn--ghost btn--inline" style={{marginTop:16,width:"auto",padding:"8px 20px"}} onClick={onHide}>
+      <button className="btn btn--ghost btn--inline" style={{marginTop:14,width:"auto",padding:"8px 20px"}} onClick={onHide}>
         Hide Word
       </button>
     </div>
