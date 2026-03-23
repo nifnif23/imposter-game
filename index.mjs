@@ -433,9 +433,10 @@ io.on("connection", (socket) => {
     if (room.hostId !== pid) return cb?.({ error: "Only host can change settings" });
 
     room.settings = {
-      imposters: Math.max(1, Math.min(Number(settings.imposters) || 1, 4)),
-      mode:      ["hidden","known"].includes(settings.mode) ? settings.mode : "hidden",
-      themeId:   settings.themeId || null,
+      imposters:  Math.max(1, Math.min(Number(settings.imposters) || 1, 4)),
+      mode:       ["hidden","known"].includes(settings.mode) ? settings.mode : "hidden",
+      themeId:    settings.themeId || null,
+      arcFilter:  Array.isArray(settings.arcFilter) ? settings.arcFilter : null,
     };
 
     io.to(code).emit("room_update", roomPublicState(room));
@@ -492,7 +493,19 @@ io.on("connection", (socket) => {
 
     if (room.settings.themeId) {
       const theme = await fetchTheme(room.settings.themeId);
-      if (theme?.words?.length) wordPool = theme.words;
+      if (theme?.words?.length) {
+        let words = theme.words;
+        // Apply arc filter if set
+        if (room.settings.arcFilter && Array.isArray(room.settings.arcFilter) && theme.arc_tags) {
+          const allowedArcs = new Set(room.settings.arcFilter);
+          words = words.filter(w => {
+            const arc = theme.arc_tags[w];
+            // Always include concept words and words with no arc tag
+            return !arc || arc === "concept" || allowedArcs.has(arc);
+          });
+        }
+        if (words.length >= 2) wordPool = words;
+      }
     }
 
     const playerIds     = [...room.players.keys()];

@@ -247,9 +247,11 @@ function GameArea({ game, onLeave }) {
 // PAGE: Lobby
 // ═══════════════════════════════════════════════════════════════
 function LobbyPage({ game, onLeave }) {
-  const [themes,   setThemes]   = useState([]);
-  const [settings, setSettings] = useState({ imposters:1, mode:"hidden", themeId:null });
-  const [copied,   setCopied]   = useState(null); // false | "link" | "code" 
+  const [themes,      setThemes]      = useState([]);
+  const [settings,    setSettings]    = useState({ imposters:1, mode:"hidden", themeId:null, arcFilter:null });
+  const [copied,      setCopied]      = useState(null);
+  const [arcExpanded, setArcExpanded] = useState(false);
+  const [fullTheme,   setFullTheme]   = useState(null); // full theme data with arc_groups
 
   const [themeError, setThemeError] = useState(false);
 
@@ -414,6 +416,57 @@ function LobbyPage({ game, onLeave }) {
                   ))}
                 </div>
               </div>
+
+              {/* Arc filter — shown when selected theme has arc_groups */}
+              {fullTheme?.arc_groups && Object.keys(fullTheme.arc_groups).length > 1 && (
+                <div style={{marginTop:8,border:"1px solid var(--border)",borderRadius:6,overflow:"hidden"}}>
+                  <button
+                    onClick={()=>setArcExpanded(e=>!e)}
+                    style={{
+                      width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",
+                      padding:"9px 12px",background:"var(--bg)",border:"none",cursor:"pointer",
+                      fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)",letterSpacing:1,
+                    }}>
+                    <span>ARC FILTER {settings.arcFilter && settings.arcFilter.length < Object.keys(fullTheme.arc_groups).length ? `(${settings.arcFilter.length} selected)` : "(all arcs)"}</span>
+                    <span>{arcExpanded ? "▲" : "▼"}</span>
+                  </button>
+                  {arcExpanded && (
+                    <div style={{padding:"8px 12px",background:"var(--surface)",display:"flex",flexDirection:"column",gap:6}}>
+                      <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>
+                        Uncheck arcs to remove spoilers. Concepts are always included.
+                      </div>
+                      {Object.entries(fullTheme.arc_groups).map(([arcKey, arcName]) => {
+                        const isSpoiler = arcKey.includes("manga") || arcKey.includes("egghead") || arcKey.includes("dbs-manga");
+                        const isSelected = !settings.arcFilter || settings.arcFilter.includes(arcKey);
+                        const wordCount = Object.values(fullTheme.arc_tags||{}).filter(a=>a===arcKey).length;
+                        return (
+                          <label key={arcKey} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"4px 0"}}>
+                            <input type="checkbox" checked={isSelected}
+                              onChange={e=>{
+                                const allArcs = Object.keys(fullTheme.arc_groups);
+                                const current = settings.arcFilter || allArcs;
+                                const next = e.target.checked
+                                  ? [...new Set([...current, arcKey])]
+                                  : current.filter(a=>a!==arcKey);
+                                // If all selected, set to null (no filter)
+                                setSettings(s=>({...s, arcFilter: next.length===allArcs.length ? null : next}));
+                              }}
+                              style={{accentColor:"var(--green)",width:14,height:14}}
+                            />
+                            <span style={{flex:1,fontSize:12,color: isSpoiler ? "var(--accent)" : "var(--text)"}}>
+                              {arcName} {isSpoiler ? "⚠" : ""}
+                            </span>
+                            <span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)"}}>{wordCount}w</span>
+                          </label>
+                        );
+                      })}
+                      <button className="nav-link" style={{textAlign:"left",marginTop:4}} onClick={()=>setSettings(s=>({...s,arcFilter:null}))}>
+                        select all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {error && <div className="msg msg--error">{error}</div>}
